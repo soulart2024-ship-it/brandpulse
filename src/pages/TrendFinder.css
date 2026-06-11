@@ -1,0 +1,15 @@
+.trends-list { display: flex; flex-direction: column; gap: 14px; }
+.trend-card { display: flex; flex-direction: column; gap: 10px; }
+.trend-header { display: flex; gap: 8px; align-items: center; }
+.trend-title { font-size: 16px; font-weight: 700; color: var(--text-hi); font-family: 'Space Grotesk', sans-serif; }
+.trend-desc { font-size: 13px; color: var(--text-mid); line-height: 1.6; }
+.trend-hook {
+  background: var(--bg-lift); border-left: 3px solid var(--rose);
+  padding: 10px 14px; border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 13px; color: var(--text-hi);
+  display: flex; gap: 10px; align-items: flex-start;
+}
+.trend-label { font-size: 10px; font-weight: 700; color: var(--rose);
+  font-family: 'Space Grotesk', sans-serif; letter-spacing: 0.5px;
+  text-transform: uppercase; flex-shrink: 0; margin-top: 2px; }
+.trend-tags { display: flex; flex-wrap: wrap; gap: 6px; }

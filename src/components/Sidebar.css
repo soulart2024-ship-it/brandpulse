@@ -1,0 +1,89 @@
+.sidebar {
+  background: var(--bg-card);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s ease;
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  overflow: hidden;
+  z-index: 100;
+  flex-shrink: 0;
+}
+.sidebar.open  { width: 220px; }
+.sidebar.closed { width: 60px; }
+
+.sidebar-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 14px 14px;
+  border-bottom: 1px solid var(--border);
+  gap: 10px;
+}
+.sidebar-logo {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 16px; font-weight: 700;
+  color: var(--text-hi);
+  white-space: nowrap;
+}
+.logo-icon { color: var(--violet-mid); }
+
+.toggle-btn {
+  background: var(--bg-lift); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text-mid);
+  cursor: pointer; padding: 6px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.toggle-btn:hover { color: var(--text-hi); border-color: var(--violet); }
+
+.sidebar-brand-pill {
+  margin: 12px 14px 4px;
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(124,58,237,0.1);
+  border: 1px solid rgba(124,58,237,0.25);
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 12px; font-weight: 600;
+  color: var(--violet-glow);
+  font-family: 'Space Grotesk', sans-serif;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.brand-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--violet-mid); flex-shrink: 0;
+  animation: pulse-glow 2s ease infinite;
+}
+
+.sidebar-nav {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  padding: 8px 8px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 10px;
+  border-radius: var(--radius);
+  background: transparent; border: none;
+  color: var(--text-mid);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px; font-weight: 500;
+  cursor: pointer; text-align: left;
+  white-space: nowrap;
+  transition: all 0.15s;
+  width: 100%;
+}
+.nav-item:hover { background: var(--bg-lift); color: var(--text-hi); }
+.nav-item.active {
+  background: linear-gradient(135deg, rgba(124,58,237,0.25), rgba(155,92,246,0.15));
+  color: var(--violet-glow);
+  border: 1px solid rgba(124,58,237,0.3);
+}
+
+.sidebar-footer {
+  padding: 14px;
+  border-top: 1px solid var(--border);
+}
+.sidebar-version { font-size: 11px; color: var(--text-lo); }
