@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { TrendingUp, Search, Sparkles } from 'lucide-react'
+import { TrendingUp, Search, Sparkles, ArrowRight } from 'lucide-react'
 import { callClaude } from '../lib/api.js'
 import './Page.css'
+import './TrendFinder.css'
 
 const PLATFORMS = ['Instagram', 'TikTok', 'LinkedIn', 'YouTube', 'Facebook', 'Pinterest', 'X (Twitter)']
 
-export default function TrendFinder({ brand }) {
+export default function TrendFinder({ brand, onSelectTrend }) {
   const [platform, setPlatform] = useState('Instagram')
   const [niche, setNiche] = useState(brand?.industry ?? '')
   const [loading, setLoading] = useState(false)
@@ -16,15 +17,15 @@ export default function TrendFinder({ brand }) {
     setResults(null)
     try {
       const text = await callClaude({
-        system: `You are a social media trend analyst. Give practical, specific trending content ideas for ${platform} in the niche provided. Format as JSON: { "trends": [{ "title": "...", "description": "...", "format": "Reel/Carousel/etc", "hook": "...", "hashtags": ["..."] }] } — 5 trends, JSON only.`,
-        messages: [{ role: 'user', content: `Find current trending content ideas for ${platform} in the ${niche || 'general wellness'} niche. Brand tone: ${brand?.tone ?? 'professional'}.` }],
-        max_tokens: 1200
+        system: 'You are a social media trend analyst. Return JSON only: { "trends": [{ "title": "...", "description": "...", "format": "Reel/Carousel/Story/Static Post", "hook": "...", "hashtags": ["..."], "contentIdeas": ["idea1","idea2","idea3"] }] } — 5 trends, no markdown.',
+        messages: [{ role: 'user', content: `Find trending content ideas for ${platform} in the ${niche || 'general'} niche. Brand tone: ${brand?.tone ?? 'professional'}.` }],
+        max_tokens: 1500
       })
       const clean = text.replace(/```json|```/g, '').trim()
       const parsed = JSON.parse(clean)
-      setResults(parsed.trends)
+      setResults(parsed.trends.map(t => ({ ...t, platform })))
     } catch {
-      setResults([{ title: 'Try again', description: 'Could not fetch trends right now — check your API key is set in Vercel.', format: '—', hook: '—', hashtags: [] }])
+      setResults([{ title: 'Try again', description: 'Could not fetch trends — check API key.', format: '—', hook: '—', hashtags: [], contentIdeas: [], platform }])
     }
     setLoading(false)
   }
@@ -35,7 +36,7 @@ export default function TrendFinder({ brand }) {
         <TrendingUp size={24} className="page-icon-rose" />
         <div>
           <h2>Trend Finder</h2>
-          <p>Discover what's performing right now on each platform — tailored to your niche.</p>
+          <p>Find what's trending — then click "Use This Trend" to create your post in Post Studio.</p>
         </div>
       </div>
 
@@ -57,7 +58,7 @@ export default function TrendFinder({ brand }) {
       {loading && (
         <div className="card" style={{textAlign:'center', padding:40}}>
           <Sparkles size={28} style={{color:'var(--violet-mid)', margin:'0 auto 12px'}} />
-          <p style={{color:'var(--text-mid)'}}>Analysing {platform} trends for {niche || 'your niche'}…</p>
+          <p style={{color:'var(--text-mid)'}}>Analysing {platform} trends…</p>
         </div>
       )}
 
@@ -68,6 +69,7 @@ export default function TrendFinder({ brand }) {
               <div className="trend-header">
                 <span className="tag tag-rose">#{i + 1}</span>
                 <span className="tag tag-electric">{t.format}</span>
+                <span className="tag tag-violet">{t.platform}</span>
               </div>
               <h3 className="trend-title">{t.title}</h3>
               <p className="trend-desc">{t.description}</p>
@@ -75,10 +77,23 @@ export default function TrendFinder({ brand }) {
                 <span className="trend-label">Hook</span>
                 <span>{t.hook}</span>
               </div>
+              {t.contentIdeas?.length > 0 && (
+                <div className="trend-ideas">
+                  <span className="trend-label">Content ideas</span>
+                  <ul>
+                    {t.contentIdeas.map((idea, j) => <li key={j}>{idea}</li>)}
+                  </ul>
+                </div>
+              )}
               {t.hashtags?.length > 0 && (
                 <div className="trend-tags">
                   {t.hashtags.map(h => <span key={h} className="tag tag-violet">{h.startsWith('#') ? h : '#'+h}</span>)}
                 </div>
+              )}
+              {onSelectTrend && (
+                <button className="btn btn-primary use-trend-btn" onClick={() => onSelectTrend(t)}>
+                  Use This Trend in Post Studio <ArrowRight size={15} />
+                </button>
               )}
             </div>
           ))}

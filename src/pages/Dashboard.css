@@ -1,59 +1,101 @@
-.dashboard { display: flex; flex-direction: column; gap: 28px; }
+.dashboard { display: flex; flex-direction: column; gap: 32px; }
 .dash-header {
   display: flex; align-items: flex-start; justify-content: space-between;
   gap: 20px; flex-wrap: wrap;
+  padding-bottom: 24px; border-bottom: 1px solid var(--border);
 }
 .dash-eyebrow {
   font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
   text-transform: uppercase; color: var(--violet-mid);
-  font-family: 'Space Grotesk', sans-serif;
-  display: block; margin-bottom: 8px;
+  font-family: 'Space Grotesk', sans-serif; display: block; margin-bottom: 8px;
 }
 .dash-header h1 {
   font-size: clamp(22px, 4vw, 32px); font-weight: 700;
-  color: var(--text-hi); display: flex; align-items: center; gap: 10px;
-  margin-bottom: 6px;
+  color: var(--text-hi); display: flex; align-items: center; gap: 10px; margin-bottom: 6px;
 }
 .dash-zap { color: var(--gold); }
-.dash-header p { font-size: 14px; color: var(--text-mid); max-width: 400px; }
+.dash-header p { font-size: 14px; color: var(--text-mid); max-width: 480px; }
 
-.dash-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-.stat-card { text-align: center; padding: 20px; }
-.stat-value { font-size: 28px; font-weight: 700; color: var(--violet-glow); font-family: 'Space Grotesk', sans-serif; }
-.stat-label { font-size: 12px; font-weight: 600; color: var(--text-mid); margin: 4px 0 2px; font-family: 'Space Grotesk', sans-serif; }
-.stat-sub { font-size: 11px; color: var(--text-lo); }
-
-.dash-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 14px;
+.section-title {
+  font-size: 13px; font-weight: 700; color: var(--text-mid);
+  font-family: 'Space Grotesk', sans-serif; letter-spacing: 0.5px;
+  text-transform: uppercase; margin-bottom: 14px;
 }
-.module-card {
-  display: flex; align-items: center; gap: 16px;
-  padding: 18px 20px; border: none; cursor: pointer; text-align: left;
-  transition: all 0.2s; width: 100%;
-}
-.module-card:hover { transform: translateY(-2px); }
-.module-card.color-violet:hover { box-shadow: 0 8px 32px rgba(124,58,237,0.25); border-color: rgba(124,58,237,0.4); }
-.module-card.color-electric:hover { box-shadow: 0 8px 32px rgba(6,182,212,0.2); border-color: rgba(6,182,212,0.4); }
-.module-card.color-rose:hover { box-shadow: 0 8px 32px rgba(244,114,182,0.2); border-color: rgba(244,114,182,0.4); }
-.module-card.color-gold:hover { box-shadow: 0 8px 32px rgba(251,191,36,0.2); border-color: rgba(251,191,36,0.4); }
 
-.module-icon {
-  width: 46px; height: 46px; border-radius: 12px;
+/* Flow */
+.flow-section {}
+.flow-grid {
+  display: flex; align-items: stretch; gap: 0;
+  overflow-x: auto; padding-bottom: 4px;
+}
+.flow-item { display: flex; align-items: center; flex: 1; min-width: 200px; }
+.flow-card {
+  flex: 1; display: flex; align-items: center; gap: 12px;
+  padding: 16px; border: none; cursor: pointer; text-align: left;
+  transition: all 0.2s; position: relative;
+}
+.flow-card:hover { transform: translateY(-2px); }
+.flow-card.color-violet:hover { border-color: rgba(124,58,237,0.4); box-shadow: 0 8px 24px rgba(124,58,237,0.2); }
+.flow-card.color-electric:hover { border-color: rgba(6,182,212,0.4); box-shadow: 0 8px 24px rgba(6,182,212,0.2); }
+.flow-card.color-rose:hover { border-color: rgba(244,114,182,0.4); box-shadow: 0 8px 24px rgba(244,114,182,0.2); }
+.flow-card.color-gold:hover { border-color: rgba(251,191,36,0.4); box-shadow: 0 8px 24px rgba(251,191,36,0.2); }
+
+.flow-step-num {
+  position: absolute; top: 10px; right: 10px;
+  font-size: 10px; font-weight: 700; color: var(--text-lo);
+  font-family: 'Space Grotesk', sans-serif;
+  background: var(--bg-lift); border: 1px solid var(--border);
+  border-radius: 50%; width: 18px; height: 18px;
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
+}
+.flow-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .icon-violet  { background: rgba(124,58,237,0.2); color: var(--violet-mid); }
 .icon-electric{ background: rgba(6,182,212,0.15); color: var(--electric); }
 .icon-rose    { background: rgba(244,114,182,0.15); color: var(--rose); }
 .icon-gold    { background: rgba(251,191,36,0.15); color: var(--gold); }
 
+.flow-info { flex: 1; min-width: 0; }
+.flow-info h3 { font-size: 13px; font-weight: 600; color: var(--text-hi);
+  font-family: 'Space Grotesk', sans-serif; margin-bottom: 2px; }
+.flow-info p  { font-size: 11px; color: var(--text-mid); line-height: 1.4; }
+.flow-arrow { color: var(--text-lo); flex-shrink: 0; }
+.flow-connector {
+  color: var(--text-lo); padding: 0 4px; flex-shrink: 0;
+}
+
+/* More */
+.more-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.module-card {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px; border: none; cursor: pointer; text-align: left;
+  transition: all 0.2s; width: 100%;
+}
+.module-card:hover { transform: translateY(-2px); }
+.module-icon {
+  width: 38px; height: 38px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
 .module-info { flex: 1; min-width: 0; }
-.module-info h3 { font-size: 14px; font-weight: 600; color: var(--text-hi); margin-bottom: 3px; font-family: 'Space Grotesk', sans-serif; }
-.module-info p  { font-size: 12px; color: var(--text-mid); line-height: 1.4; }
+.module-info h3 { font-size: 13px; font-weight: 600; color: var(--text-hi);
+  font-family: 'Space Grotesk', sans-serif; margin-bottom: 2px; }
+.module-info p  { font-size: 11px; color: var(--text-mid); }
 .module-arrow { color: var(--text-lo); flex-shrink: 0; }
 
-@media (max-width: 600px) {
-  .dash-stats { grid-template-columns: 1fr; }
+/* Quick start */
+.quick-start {
+  display: flex; align-items: center; gap: 14px;
+  background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(6,182,212,0.05));
+  border-color: rgba(124,58,237,0.25); flex-wrap: wrap;
+}
+.quick-start h4 { font-size: 14px; font-weight: 700; color: var(--text-hi);
+  font-family: 'Space Grotesk', sans-serif; margin-bottom: 2px; }
+.quick-start p { font-size: 12px; color: var(--text-mid); }
+.quick-start > div { flex: 1; }
+
+@media (max-width: 768px) {
+  .flow-grid { flex-direction: column; }
+  .flow-connector { transform: rotate(90deg); }
 }
