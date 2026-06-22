@@ -55,7 +55,7 @@ export default function App() {
     brand: <BrandBrain brand={activeBrand} onSave={saveBrand} />,
     assets: <AssetLibrary assets={assets} onAssetsChange={setAssets} brand={activeBrand} />,
     trends: <TrendFinder brand={activeBrand} onSelectTrend={handleSelectTrend} />,
-    studio: <PostStudio brand={activeBrand} assets={assets} selectedTrend={selectedTrend} onNavigate={setPage} />,
+    studio: <PostStudio brand={activeBrand} assets={assets} onAssetsChange={setAssets} selectedTrend={selectedTrend} onNavigate={setPage} />,
     video: <VideoHub />,
     calendar: <Calendar />,
   }
