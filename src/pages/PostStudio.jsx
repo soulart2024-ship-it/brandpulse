@@ -25,39 +25,32 @@ async function toBase64(url) {
   })
 }
 
-// ── Reliable text helpers ─────────────────────────────────────────────────────
-// fitText: auto-scales font down until text fits in ONE line — no overflow ever
-function fitText(ctx, text, x, y, maxW, maxSize, weight, align = 'center') {
+// ── Text helpers ──────────────────────────────────────────────────────────────
+function fitOneLine(ctx, text, x, y, maxW, maxPx, weight, family = 'Space Grotesk') {
   if (!text) return
-  ctx.textAlign = align
-  let size = maxSize
-  ctx.font = `${weight} ${size}px "Space Grotesk",sans-serif`
-  while (ctx.measureText(text).width > maxW && size > 8) {
-    size -= 1
-    ctx.font = `${weight} ${size}px "Space Grotesk",sans-serif`
+  let sz = maxPx
+  ctx.font = `${weight} ${sz}px "${family}",sans-serif`
+  while (ctx.measureText(text).width > maxW && sz > 7) {
+    sz--
+    ctx.font = `${weight} ${sz}px "${family}",sans-serif`
   }
   ctx.fillText(text, x, y)
 }
 
-// wrapText2: wraps text into max 2 lines, truncates with … if needed
-function wrapText2(ctx, text, x, y, maxW, lineH, maxLines = 2) {
+function twoLines(ctx, text, x, y, maxW, lineH, weight, size, family = 'Inter') {
   if (!text) return
+  ctx.font = `${weight} ${size}px "${family}",sans-serif`
   const words = text.split(' ')
-  let line = '', cy = y, linesDrawn = 0
-  for (let n = 0; n < words.length; n++) {
-    const test = line + words[n] + ' '
-    if (ctx.measureText(test).width > maxW && n > 0) {
+  let line = '', cy = y, drawn = 0
+  for (let i = 0; i < words.length; i++) {
+    const test = line + words[i] + ' '
+    if (ctx.measureText(test).width > maxW && i > 0) {
       ctx.fillText(line.trim(), x, cy)
-      line = words[n] + ' '
-      cy += lineH; linesDrawn++
-      if (linesDrawn >= maxLines - 1) {
-        // Final line — truncate if needed
-        const rest = words.slice(n + 1).join(' ')
-        let last = (line + rest).trim()
-        while (ctx.measureText(last + '…').width > maxW && last.length > 1) {
-          last = last.slice(0, -1)
-        }
-        ctx.fillText(last.trim() + (rest ? '…' : ''), x, cy)
+      line = words[i] + ' '; cy += lineH; drawn++
+      if (drawn >= 1) {
+        let last = (line + words.slice(i + 1).join(' ')).trim()
+        while (ctx.measureText(last + '…').width > maxW && last.length > 2) last = last.slice(0, -1)
+        ctx.fillText(last + (words.length > i + 1 ? '…' : ''), x, cy)
         return
       }
     } else line = test
@@ -65,164 +58,183 @@ function wrapText2(ctx, text, x, y, maxW, lineH, maxLines = 2) {
   ctx.fillText(line.trim(), x, cy)
 }
 
-// ── Canvas Templates ──────────────────────────────────────────────────────────
-// All use dedicated text zones — text NEVER overlaps with product area
+// ── TEMPLATE 1: Clean Strip ───────────────────────────────────────────────────
+// Photo top 62% (hard clip) | Solid accent strip bottom 38% | ALL text in strip
+function drawCleanStrip(ctx, w, h, img, post, brand, accent) {
+  const SPLIT = 0.62  // IMMUTABLE — image zone / text zone boundary
 
-function drawPodium(ctx, w, h, img, post, brand, accent) {
-  // Photo top 63% | Brand colour strip bottom 37%
+  // Background
   ctx.fillStyle = '#0F0A1E'; ctx.fillRect(0, 0, w, h)
 
-  const imgH = h * 0.63
+  // Image zone — strictly clipped, NOTHING escapes upward
+  const imgH = h * SPLIT
   if (img) {
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, imgH); ctx.clip()
     const s = Math.max(w / img.width, imgH / img.height)
-    ctx.drawImage(img, -(img.width * s - w) / 2, -(img.height * s - imgH) / 2, img.width * s, img.height * s)
+    const iw = img.width * s, ih = img.height * s
+    ctx.drawImage(img, (w - iw) / 2, (imgH - ih) / 2, iw, ih)
     ctx.restore()
-    // Smooth fade into strip
-    const fade = ctx.createLinearGradient(0, imgH - 24, 0, imgH + 2)
-    fade.addColorStop(0, 'rgba(0,0,0,0)'); fade.addColorStop(1, accent)
-    ctx.fillStyle = fade; ctx.fillRect(0, imgH - 24, w, 26)
   }
 
-  // Colour strip
+  // Fade line between zones
+  const fadeGrad = ctx.createLinearGradient(0, imgH - 20, 0, imgH + 1)
+  fadeGrad.addColorStop(0, 'rgba(0,0,0,0)'); fadeGrad.addColorStop(1, accent + 'FF')
+  ctx.fillStyle = fadeGrad; ctx.fillRect(0, imgH - 20, w, 22)
+
+  // Text strip — starts exactly at imgH, NOTHING above this line
   ctx.fillStyle = accent; ctx.fillRect(0, imgH, w, h - imgH)
 
-  // Text — strictly inside strip
-  const pad = w * 0.06
-  const stripW = w - pad * 2
-  const stripMid = imgH + (h - imgH) * 0.5
+  const stripH = h - imgH
+  const pad = w * 0.07
+  const tw = w - pad * 2
+  const ty = imgH  // text zone top boundary
 
   // Kicker
-  ctx.fillStyle = 'rgba(255,255,255,0.55)'
-  ctx.font = `600 ${Math.max(7, h * 0.032)}px "Space Grotesk",sans-serif`
-  ctx.textAlign = 'center'
-  ctx.fillText((brand?.industry ?? '').toUpperCase().slice(0, 20), w / 2, imgH + (h - imgH) * 0.2)
+  ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.textAlign = 'center'
+  ctx.font = `600 ${Math.max(7, stripH * 0.11)}px "Space Grotesk",sans-serif`
+  ctx.fillText((brand?.industry ?? '').toUpperCase().slice(0, 18), w / 2, ty + stripH * 0.19)
 
-  // Headline — auto-fit to one line
-  ctx.fillStyle = '#FFF'
-  fitText(ctx, post.headline ?? '', w / 2, stripMid - h * 0.01, stripW, Math.max(13, h * 0.068), '800')
+  // Headline — one line, auto-sized
+  ctx.fillStyle = '#FFFFFF'
+  fitOneLine(ctx, post.headline ?? '', w / 2, ty + stripH * 0.47, tw, Math.max(12, stripH * 0.22), '800')
 
-  // Subtext — max 2 lines
-  ctx.fillStyle = 'rgba(255,255,255,0.78)'
-  ctx.font = `400 ${Math.max(9, h * 0.036)}px Inter,sans-serif`
-  ctx.textAlign = 'center'
-  wrapText2(ctx, post.subtext ?? '', w / 2, stripMid + h * 0.062, stripW, h * 0.044)
+  // Subtext — two lines max
+  ctx.fillStyle = 'rgba(255,255,255,0.78)'; ctx.textAlign = 'center'
+  twoLines(ctx, post.subtext ?? '', w / 2, ty + stripH * 0.66, tw, stripH * 0.13, '400', Math.max(8, stripH * 0.11))
 
-  // Brand name
+  // Brand watermark
   ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.textAlign = 'right'
-  ctx.font = `600 ${Math.max(6, h * 0.029)}px "Space Grotesk",sans-serif`
-  ctx.fillText(brand?.name ?? '', w - 10, h - 7)
+  ctx.font = `600 ${Math.max(6, h * 0.027)}px "Space Grotesk",sans-serif`
+  ctx.fillText(brand?.name ?? '', w - 8, h - 6)
 }
 
-function drawFeature(ctx, w, h, img, post, brand, accent) {
-  // Photo left 54% | Brand panel right 46%
+// ── TEMPLATE 2: Bold Side ─────────────────────────────────────────────────────
+// Photo left 54% (hard clip) | Accent panel right 46% | ALL text in right panel
+function drawBoldSide(ctx, w, h, img, post, brand, accent) {
+  const VSPLIT = 0.54  // IMMUTABLE — left image / right text boundary
+
   ctx.fillStyle = '#0F0A1E'; ctx.fillRect(0, 0, w, h)
 
+  // Image zone — strictly clipped to left side
+  const imgW = w * VSPLIT
   if (img) {
-    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w * 0.54, h); ctx.clip()
-    const s = Math.max((w * 0.54) / img.width, h / img.height)
-    ctx.drawImage(img, -(img.width * s - w * 0.54) / 2, -(img.height * s - h) / 2, img.width * s, img.height * s)
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, imgW, h); ctx.clip()
+    const s = Math.max(imgW / img.width, h / img.height)
+    const iw = img.width * s, ih = img.height * s
+    ctx.drawImage(img, (imgW - iw) / 2, (h - ih) / 2, iw, ih)
     ctx.restore()
   }
 
-  ctx.fillStyle = accent; ctx.fillRect(w * 0.54, 0, w * 0.46, h)
-  // Diagonal accent
+  // Right panel — solid accent
+  ctx.fillStyle = accent; ctx.fillRect(imgW, 0, w - imgW, h)
+
+  // Diagonal accent edge
   ctx.beginPath()
-  ctx.moveTo(w * 0.51, 0); ctx.lineTo(w * 0.57, 0); ctx.lineTo(w * 0.54, h); ctx.lineTo(w * 0.48, h)
+  ctx.moveTo(imgW - 18, 0); ctx.lineTo(imgW + 4, 0)
+  ctx.lineTo(imgW + 4, h); ctx.lineTo(imgW - 18, h)
   ctx.fillStyle = accent; ctx.fill()
 
-  // Text panel — right side strictly
-  const tx = w * 0.61
-  const panelW = w - tx - w * 0.04
-  const panelMid = h * 0.48
+  // Text — right panel ONLY, safely inside
+  const panelX = imgW + (w - imgW) * 0.1
+  const panelW = (w - imgW) * 0.82
+  const panelMidY = h * 0.44
 
-  // Kicker
-  ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.textAlign = 'left'
+  // Brand industry kicker
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.textAlign = 'left'
   ctx.font = `600 ${Math.max(7, h * 0.031)}px "Space Grotesk",sans-serif`
-  ctx.fillText((brand?.industry ?? 'BRAND').toUpperCase().slice(0, 12), tx, h * 0.16)
+  ctx.fillText((brand?.industry ?? 'BRAND').toUpperCase().slice(0, 11), panelX, h * 0.15)
 
-  // Headline — auto-fit
-  ctx.fillStyle = '#FFF'
-  fitText(ctx, post.headline ?? '', tx, panelMid - h * 0.04, panelW, Math.max(11, h * 0.067), '800', 'left')
+  // Divider
+  ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(panelX, h * 0.19, panelW * 0.4, 1)
 
-  // Subtext — 2 lines max
-  ctx.fillStyle = 'rgba(255,255,255,0.78)'
-  ctx.font = `400 ${Math.max(8, h * 0.036)}px Inter,sans-serif`
-  ctx.textAlign = 'left'
-  wrapText2(ctx, post.subtext ?? '', tx, panelMid + h * 0.038, panelW, h * 0.044)
+  // Headline — one line, auto-sized
+  ctx.fillStyle = '#FFFFFF'
+  fitOneLine(ctx, post.headline ?? '', panelX, panelMidY, panelW, Math.max(11, h * 0.066), '800', 'Space Grotesk')
+
+  // Subtext
+  ctx.fillStyle = 'rgba(255,255,255,0.78)'; ctx.textAlign = 'left'
+  twoLines(ctx, post.subtext ?? '', panelX, panelMidY + h * 0.085, panelW, h * 0.044, '400', Math.max(8, h * 0.036))
 
   // CTA pill
-  const ctaY = h * 0.76, ctaW = panelW * 0.9, ctaH = h * 0.09
+  const ctaY = h * 0.75, ctaH = h * 0.09, ctaW = Math.min(panelW, 130)
   ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.beginPath()
-  ctx.roundRect(tx, ctaY, ctaW, ctaH, 4); ctx.fill()
-  ctx.fillStyle = '#FFF'; ctx.textAlign = 'center'
-  fitText(ctx, post.cta ?? 'Learn More', tx + ctaW / 2, ctaY + ctaH * 0.65, ctaW - 8, Math.max(7, h * 0.034), '700')
+  ctx.roundRect(panelX, ctaY, ctaW, ctaH, 4); ctx.fill()
+  ctx.fillStyle = '#FFF'
+  fitOneLine(ctx, post.cta ?? 'Learn More', panelX + ctaW / 2, ctaY + ctaH * 0.67, ctaW - 10, Math.max(7, h * 0.033), '700', 'Space Grotesk')
+  ctx.textAlign = 'center'
 
   // Brand
   ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.textAlign = 'right'
-  ctx.font = `600 ${Math.max(6, h * 0.028)}px "Space Grotesk",sans-serif`
+  ctx.font = `600 ${Math.max(6, h * 0.027)}px "Space Grotesk",sans-serif`
   ctx.fillText(brand?.name ?? '', w - 8, h - 7)
 }
 
-function drawDrama(ctx, w, h, img, post, brand, accent) {
-  // Full image | gradient text zone bottom 39%
-  ctx.fillStyle = '#111'; ctx.fillRect(0, 0, w, h)
+// ── TEMPLATE 3: Dark Base ─────────────────────────────────────────────────────
+// Photo top 60% (hard clip) | Dark gradient strip bottom 40% | text in strip only
+function drawDarkBase(ctx, w, h, img, post, brand, accent) {
+  const SPLIT = 0.60  // IMMUTABLE
 
+  ctx.fillStyle = '#0a0518'; ctx.fillRect(0, 0, w, h)
+
+  const imgH = h * SPLIT
   if (img) {
-    const s = Math.max(w / img.width, h / img.height)
-    ctx.drawImage(img, -(img.width * s - w) / 2, -(img.height * s - h) / 2, img.width * s, img.height * s)
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, imgH); ctx.clip()
+    const s = Math.max(w / img.width, imgH / img.height)
+    const iw = img.width * s, ih = img.height * s
+    ctx.drawImage(img, (w - iw) / 2, (imgH - ih) / 2, iw, ih)
+    ctx.restore()
   }
 
-  // Text zone — bottom 39%, gradient overlay
-  const textY = h * 0.61
-  const textH = h - textY
-  const grad = ctx.createLinearGradient(0, textY - 28, 0, h)
-  grad.addColorStop(0, 'rgba(0,0,0,0)'); grad.addColorStop(0.25, 'rgba(0,0,0,0.82)'); grad.addColorStop(1, 'rgba(0,0,0,0.97)')
-  ctx.fillStyle = grad; ctx.fillRect(0, textY - 28, w, textH + 28)
+  // Dark strip — starts at imgH
+  const darkGrad = ctx.createLinearGradient(0, imgH - 15, 0, h)
+  darkGrad.addColorStop(0, 'rgba(10,5,24,0)'); darkGrad.addColorStop(0.15, 'rgba(10,5,24,0.95)'); darkGrad.addColorStop(1, 'rgba(10,5,24,1)')
+  ctx.fillStyle = darkGrad; ctx.fillRect(0, imgH - 15, w, h - imgH + 15)
 
-  // Accent left bar
-  ctx.fillStyle = accent; ctx.fillRect(0, textY, 4, textH)
+  // Accent bar
+  ctx.fillStyle = accent; ctx.fillRect(0, imgH, w, 3)
 
-  const tx = 14, textW = w - tx - 12
+  const stripH = h - imgH
+  const pad = 14
+  const tw = w - pad * 2
+  const ty = imgH + 3  // strictly below accent bar
 
   // Kicker
   ctx.fillStyle = accent; ctx.textAlign = 'left'
-  ctx.font = `700 ${Math.max(7, h * 0.031)}px "Space Grotesk",sans-serif`
-  ctx.fillText((brand?.industry ?? '').toUpperCase().slice(0, 16), tx, textY + textH * 0.14)
+  ctx.font = `700 ${Math.max(7, stripH * 0.1)}px "Space Grotesk",sans-serif`
+  ctx.fillText((brand?.industry ?? '').toUpperCase().slice(0, 16), pad, ty + stripH * 0.18)
 
-  // Headline — auto-fit one line
+  // Headline — one line
   ctx.fillStyle = '#FFF'
-  fitText(ctx, post.headline ?? '', tx, textY + textH * 0.36, textW, Math.max(13, h * 0.073), '700', 'left')
-
-  // Subtext — 2 lines
-  ctx.fillStyle = 'rgba(255,255,255,0.72)'
-  ctx.font = `400 ${Math.max(9, h * 0.038)}px Inter,sans-serif`
+  fitOneLine(ctx, post.headline ?? '', pad, ty + stripH * 0.43, tw, Math.max(12, stripH * 0.21), '700', 'Space Grotesk')
   ctx.textAlign = 'left'
-  wrapText2(ctx, post.subtext ?? '', tx, textY + textH * 0.56, textW, h * 0.046)
+
+  // Subtext
+  ctx.fillStyle = 'rgba(255,255,255,0.7)'
+  twoLines(ctx, post.subtext ?? '', pad, ty + stripH * 0.61, tw, stripH * 0.13, '400', Math.max(8, stripH * 0.1))
 
   // CTA pill
-  const ctaW = Math.min(textW * 0.6, 140), ctaH = h * 0.082
-  const ctaX = tx, ctaY2 = h - ctaH - 12
-  ctx.fillStyle = accent; ctx.beginPath(); ctx.roundRect(ctaX, ctaY2, ctaW, ctaH, ctaH / 2); ctx.fill()
-  ctx.fillStyle = '#FFF'; ctx.textAlign = 'center'
-  fitText(ctx, post.cta ?? 'Learn More', ctaX + ctaW / 2, ctaY2 + ctaH * 0.65, ctaW - 10, Math.max(8, h * 0.037), '700')
+  const ctaW = Math.min(tw * 0.58, 130), ctaH = stripH * 0.18
+  const ctaX = pad, ctaY = h - ctaH - 10
+  ctx.fillStyle = accent; ctx.beginPath(); ctx.roundRect(ctaX, ctaY, ctaW, ctaH, ctaH / 2); ctx.fill()
+  ctx.fillStyle = '#FFF'
+  fitOneLine(ctx, post.cta ?? 'Learn More', ctaX + ctaW / 2, ctaY + ctaH * 0.67, ctaW - 10, Math.max(7, ctaH * 0.46), '700', 'Space Grotesk')
+  ctx.textAlign = 'center'
 
-  // Brand
+  // Brand top right
   ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.textAlign = 'right'
-  ctx.font = `600 ${Math.max(7, h * 0.032)}px "Space Grotesk",sans-serif`
-  ctx.fillText(brand?.name ?? '', w - 10, 20)
+  ctx.font = `600 ${Math.max(6, h * 0.027)}px "Space Grotesk",sans-serif`
+  ctx.fillText(brand?.name ?? '', w - 10, 18)
 }
 
 const TEMPLATES = [
-  { id: 'podium',  label: 'Podium',  draw: drawPodium,  accent: '#7C3AED' },
-  { id: 'feature', label: 'Feature', draw: drawFeature, accent: '#06B6D4' },
-  { id: 'drama',   label: 'Drama',   draw: drawDrama,   accent: '#F472B6' },
+  { id: 'clean',  label: 'Clean Strip', draw: drawCleanStrip, accent: '#7C3AED' },
+  { id: 'bold',   label: 'Bold Side',   draw: drawBoldSide,   accent: '#06B6D4' },
+  { id: 'dark',   label: 'Dark Base',   draw: drawDarkBase,   accent: '#F472B6' },
 ]
 
 export default function PostStudio({ brand, assets, onAssetsChange, selectedTrend, onNavigate }) {
   const [step, setStep] = useState(0)
 
-  // Product
   const [productUrl, setProductUrl] = useState('')
   const [productQuery, setProductQuery] = useState('')
   const [productInfo, setProductInfo] = useState(null)
@@ -230,44 +242,41 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
   const [searchingProduct, setSearchingProduct] = useState(false)
   const [productError, setProductError] = useState('')
 
-  // Photo
   const [photoId, setPhotoId] = useState(null)
-  const [photoUrl, setPhotoUrl] = useState('') // direct image URL input
+  const [photoUrl, setPhotoUrl] = useState('')
   const [platform, setPlatform] = useState(selectedTrend?.platform ?? 'Instagram')
   const [formatIdx, setFormatIdx] = useState(0)
 
-  // Scene
   const [scenes, setScenes] = useState([])
   const [loadingScenes, setLoadingScenes] = useState(false)
   const [chosenScene, setChosenScene] = useState(null)
   const [customScene, setCustomScene] = useState('')
-  const [generating, setGenerating] = useState(false)
+  const [generatingAI, setGeneratingAI] = useState(false)
   const [aiImageUrl, setAiImageUrl] = useState(null)
   const [aiError, setAiError] = useState('')
 
-  // Posts
   const [generatingPosts, setGeneratingPosts] = useState(false)
   const [posts, setPosts] = useState([])
   const [chosen, setChosen] = useState(null)
   const [editing, setEditing] = useState(null)
   const [editVal, setEditVal] = useState('')
   const [accentColors, setAccentColors] = useState(['#7C3AED', '#06B6D4', '#F472B6'])
+
   const canvasRefs = useRef({})
   const imgCache = useRef({})
   const fileRef = useRef()
-
   const fmt = FORMATS[formatIdx]
   const photo = assets.find(a => a.id === photoId)
 
-  const loadImage = (url) => new Promise((resolve) => {
+  const loadImage = useCallback((url) => new Promise((resolve) => {
     if (!url) { resolve(null); return }
     if (imgCache.current[url]) { resolve(imgCache.current[url]); return }
     const img = new window.Image()
     if (!url.startsWith('data:') && !url.startsWith('blob:')) img.crossOrigin = 'anonymous'
     img.onload = () => { imgCache.current[url] = img; resolve(img) }
-    img.onerror = () => resolve(null)
+    img.onerror = () => { console.warn('Image load failed:', url); resolve(null) }
     img.src = url
-  })
+  }), [])
 
   const handleUpload = (files) => {
     const newOnes = Array.from(files).map(f => ({
@@ -278,7 +287,6 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
     if (newOnes[0]) { setPhotoId(newOnes[0].id); setPhotoUrl(''); setAiImageUrl(null) }
   }
 
-  // Product scraping
   const scrapeProductUrl = async () => {
     if (!productUrl) return
     setScrapingProduct(true); setProductInfo(null); setProductError('')
@@ -305,19 +313,17 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
         max_tokens: 800
       })
       setProductInfo(extractJSON(result))
-    } catch { setProductError('Could not find that product — try the URL instead.') }
+    } catch { setProductError('Could not find that product.') }
     setSearchingProduct(false)
   }
 
-  // Scene suggestions
   const fetchScenes = async () => {
     setLoadingScenes(true); setScenes([]); setChosenScene(null)
     try {
       const productCtx = productInfo ? `Product: ${productInfo.name}. ${productInfo.description?.slice(0, 80)}.` : ''
-      const trendCtx = selectedTrend ? `Trending: ${selectedTrend.title}.` : ''
       const result = await callClaude({
-        system: 'Return JSON only: { "scenes": [{ "label": "4 word label", "prompt": "Detailed scene description for professional product photography. Describe setting, lighting, props, environment. Very visual and specific. e.g. Rustic wooden kitchen counter with fresh herbs and morning sunlight, marble surface, warm lifestyle aesthetic", "mood": "one word" }] } — exactly 3 different scenes.',
-        messages: [{ role: 'user', content: `Platform: ${platform}. ${productCtx} ${trendCtx} Brand: ${brand?.name ?? ''}. Industry: ${brand?.industry ?? ''}. Suggest 3 lifestyle scene settings for this product.` }],
+        system: 'Return JSON only: { "scenes": [{ "label": "4 word label", "prompt": "Detailed lifestyle setting for product photography. Describe environment, lighting, props. e.g. Sunlit wooden kitchen counter with fresh herbs, warm morning light, clean wellness aesthetic", "mood": "one word" }] } — exactly 3 scenes.',
+        messages: [{ role: 'user', content: `Platform: ${platform}. ${productCtx} Brand: ${brand?.name ?? ''}. Industry: ${brand?.industry ?? ''}. Suggest 3 lifestyle scene backgrounds for this product.` }],
         max_tokens: 600
       })
       const parsed = extractJSON(result)
@@ -327,28 +333,22 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
     setLoadingScenes(false)
   }
 
-  // Generate AI image with Gemini
   const generateAiImage = async () => {
     const hasPhoto = photo || photoUrl
-    if (!hasPhoto && !customScene) return
-    setGenerating(true); setAiImageUrl(null); setAiError('')
+    setGeneratingAI(true); setAiImageUrl(null); setAiError('')
     try {
-      const scenePrompt = customScene || scenes[chosenScene]?.prompt || 'professional lifestyle photography, clean natural light'
-      let body = { prompt: scenePrompt, mode: 'create' }
-
+      const prompt = customScene || scenes[chosenScene]?.prompt || 'professional lifestyle photography, clean natural light, wellness aesthetic'
+      let body = { prompt, mode: 'create' }
       if (hasPhoto) {
         body.mode = 'edit'
         body.productName = productInfo?.name || photo?.name || 'product'
         if (photoUrl) {
-          // Direct image URL — server fetches it
           body.imageUrl = photoUrl
         } else if (photo) {
-          // Uploaded file — convert to base64
           body.imageBase64 = await toBase64(photo.url)
           body.imageType = photo.type || 'image/jpeg'
         }
       }
-
       const res = await fetch('/api/generate-image', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -356,22 +356,21 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
       const data = await res.json()
       if (!res.ok || data.error) throw new Error(data.error || 'Image generation failed')
       setAiImageUrl(data.url)
-    } catch (e) {
-      setAiError(e.message || 'Could not generate image — check your GOOGLE_AI_KEY in Vercel.')
-    }
-    setGenerating(false)
+      // Clear image cache so canvas redraws with new image
+      imgCache.current = {}
+    } catch (e) { setAiError(e.message || 'Check your GOOGLE_AI_KEY in Vercel.') }
+    setGeneratingAI(false)
   }
 
-  // Generate posts
   const generatePosts = async () => {
     setGeneratingPosts(true); setPosts([])
     try {
       const brandCtx = brand ? `Brand: ${brand.name}. Industry: ${brand.industry}. Tone: ${brand.tone}.` : ''
       const productCtx = productInfo
-        ? `Product: ${productInfo.name}. Tagline: ${productInfo.tagline}. Description: ${productInfo.description}. Benefits: ${productInfo.benefits?.join('; ')}. Ideal for: ${productInfo.idealFor}. CTA: ${productInfo.callToAction}.`
+        ? `Product: ${productInfo.name}. Tagline: ${productInfo.tagline}. Description: ${productInfo.description}. Benefits: ${productInfo.benefits?.join('; ')}. Ideal for: ${productInfo.idealFor}.`
         : ''
       const result = await callClaude({
-        system: 'Social media copywriter for small businesses. Return JSON only: {"posts":[{"headline":"max 5 words punchy","subtext":"max 10 words","caption":"full caption with emojis","hashtags":["tag1","tag2","tag3","tag4","tag5"],"cta":"2-3 word action"}]} — exactly 3 variations with different angles.',
+        system: 'Social media copywriter. Return JSON only: {"posts":[{"headline":"max 5 words","subtext":"max 10 words","caption":"full caption with emojis","hashtags":["tag1","tag2","tag3","tag4","tag5"],"cta":"2-3 words"}]} — exactly 3 variations.',
         messages: [{ role: 'user', content: `${brandCtx} ${productCtx} Platform: ${platform}. Create 3 post variations.` }],
         max_tokens: 1200
       })
@@ -381,7 +380,6 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
     setGeneratingPosts(false)
   }
 
-  // Canvas rendering
   const renderCanvas = useCallback(async (idx) => {
     const canvas = canvasRefs.current[idx]
     if (!canvas || !posts[idx]) return
@@ -389,12 +387,15 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
     const { pw, ph } = fmt
     const tmpl = TEMPLATES[idx % TEMPLATES.length]
     const accent = accentColors[idx % 3]
-    const imageUrl = aiImageUrl || photo?.url
+    // Priority: AI image > uploaded photo > null (gradient only)
+    const imageUrl = aiImageUrl || photo?.url || null
     const img = imageUrl ? await loadImage(imageUrl) : null
     tmpl.draw(ctx, pw, ph, img, posts[idx], brand, accent)
-  }, [posts, fmt, aiImageUrl, photo, brand, accentColors])
+  }, [posts, fmt, aiImageUrl, photo, brand, accentColors, loadImage])
 
-  useEffect(() => { if (posts.length) posts.forEach((_, i) => renderCanvas(i)) }, [posts, renderCanvas])
+  useEffect(() => {
+    if (posts.length) posts.forEach((_, i) => setTimeout(() => renderCanvas(i), 80 * i))
+  }, [posts, renderCanvas])
 
   const startEdit = (idx, field, current) => { setEditing({ idx, field }); setEditVal(current ?? '') }
   const saveEdit = () => {
@@ -407,7 +408,7 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
     const off = document.createElement('canvas')
     off.width = fmt.pw * 2; off.height = fmt.ph * 2
     const ctx = off.getContext('2d'); ctx.scale(2, 2)
-    const imageUrl = aiImageUrl || photo?.url
+    const imageUrl = aiImageUrl || photo?.url || null
     const img = imageUrl ? await loadImage(imageUrl) : null
     TEMPLATES[idx % TEMPLATES.length].draw(ctx, fmt.pw, fmt.ph, img, posts[idx], brand, accentColors[idx % 3])
     const a = document.createElement('a')
@@ -428,7 +429,7 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
         <Palette size={24} className="page-icon-violet" />
         <div>
           <h2>Post Studio</h2>
-          <p>Your real product, Nano Banana AI scene, professional posts in minutes.</p>
+          <p>Real product photo + Nano Banana AI scene + clean text layouts.</p>
         </div>
       </div>
 
@@ -447,7 +448,7 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
         <div className="studio-step animate-slide-up">
           <div className="card form-card">
             <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Link size={15} /> Paste product page URL</h3>
-            <p className="form-hint">BrandPulse reads the real page and extracts name, benefits, ingredients automatically.</p>
+            <p className="form-hint">Reads the real page — name, benefits, ingredients all extracted automatically.</p>
             <div className="scan-row">
               <input value={productUrl} onChange={e => setProductUrl(e.target.value)}
                 placeholder="https://heatherandroseh.co.uk/product/nac-600"
@@ -459,7 +460,7 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
           </div>
 
           <div className="card form-card">
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Search size={15} /> Or search by product name</h3>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Search size={15} /> Or search by name</h3>
             <div className="scan-row">
               <input value={productQuery} onChange={e => setProductQuery(e.target.value)}
                 placeholder="e.g. Zooki Creatin+ for men"
@@ -477,7 +478,6 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
                 <div>
                   <strong className="product-result-name">{productInfo.name}</strong>
                   {productInfo.brand && <span className="product-result-brand"> by {productInfo.brand}</span>}
-                  {productInfo.price && <span className="product-result-price"> {productInfo.price}</span>}
                 </div>
                 <button onClick={() => setProductInfo(null)} className="product-result-clear"><X size={14} /></button>
               </div>
@@ -516,23 +516,22 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
 
           <div className="card form-card">
             <h3><Image size={15} /> Product photo</h3>
-            <p className="form-hint">Upload a photo OR paste a direct image URL. Nano Banana will keep your product exactly as is.</p>
+            <p className="form-hint">Upload a photo OR paste a direct image URL. Nano Banana keeps your product exactly as is and places it in a new scene.</p>
 
-            {/* Image URL input — new! */}
             <div className="scan-row">
-              <input value={photoUrl} onChange={e => { setPhotoUrl(e.target.value); if (e.target.value) setPhotoId(null) }}
-                placeholder="Paste product image URL e.g. https://site.com/product.jpg" />
+              <input value={photoUrl} onChange={e => { setPhotoUrl(e.target.value); if (e.target.value) { setPhotoId(null); setAiImageUrl(null) } }}
+                placeholder="Paste image URL e.g. https://site.com/product.jpg" />
               {photoUrl && <button className="btn-ghost" onClick={() => setPhotoUrl('')}><X size={14} /></button>}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-              <span style={{ fontSize: 11, color: 'var(--text-lo)' }}>or upload</span>
+              <span style={{ fontSize: 11, color: 'var(--text-lo)' }}>or upload from device</span>
               <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
             </div>
 
             <button className="btn btn-secondary" onClick={() => fileRef.current.click()} style={{ alignSelf: 'flex-start' }}>
-              <Upload size={14} /> Upload from device
+              <Upload size={14} /> Upload Photo
             </button>
             <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handleUpload(e.target.files)} />
 
@@ -550,8 +549,7 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
 
             {photoUrl && (
               <div className="url-preview animate-slide-up">
-                <img src={photoUrl} alt="Product" className="url-preview-img"
-                  onError={e => { e.target.style.display = 'none' }} />
+                <img src={photoUrl} alt="Product" className="url-preview-img" onError={e => e.target.style.display = 'none'} />
                 <p style={{ fontSize: 11, color: 'var(--success)' }}>✓ Image URL ready</p>
               </div>
             )}
@@ -559,7 +557,7 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
 
           <div className="card form-card">
             <h3><Wand2 size={15} style={{ color: 'var(--gold)' }} /> AI Scene — Nano Banana</h3>
-            <p className="form-hint">Gemini keeps your product exactly as photographed and places it into a trending lifestyle scene.</p>
+            <p className="form-hint">Gemini places your product into a lifestyle scene. Product is never altered.</p>
 
             <div className="field">
               <label>Platform</label>
@@ -593,15 +591,15 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
 
             {(chosenScene !== null || customScene) && (
               <div className="field">
-                <label>Scene description (edit if needed)</label>
+                <label>Scene description</label>
                 <textarea rows={2} value={customScene} onChange={e => setCustomScene(e.target.value)} />
               </div>
             )}
 
             <button className="btn btn-primary" onClick={generateAiImage}
-              disabled={generating || (!photo && !photoUrl && !customScene)}>
-              {generating
-                ? <><span className="spinner" /> Generating with Nano Banana…</>
+              disabled={generatingAI || (!photo && !photoUrl && !customScene)}>
+              {generatingAI
+                ? <><span className="spinner" /> Nano Banana generating…</>
                 : <><Wand2 size={14} /> {(photo || photoUrl) ? 'Place Product in Scene' : 'Generate Scene'}</>}
             </button>
             {aiError && <p className="scan-error">{aiError}</p>}
@@ -610,13 +608,13 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
               <div className="scene-result animate-slide-up">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <Check size={14} style={{ color: 'var(--success)' }} />
-                  <strong style={{ fontSize: 13 }}>Nano Banana generated ✓</strong>
+                  <strong style={{ fontSize: 13 }}>✓ Nano Banana generated</strong>
                   <button className="btn-ghost" style={{ fontSize: 11, marginLeft: 'auto' }} onClick={generateAiImage}>
                     <RefreshCw size={11} /> Regenerate free
                   </button>
                 </div>
                 <img src={aiImageUrl} alt="AI scene" className="scene-preview-img" />
-                <p className="form-hint">Happy? Generate posts below. Regenerate as many times as needed — free.</p>
+                <p className="form-hint">Happy with this? Generate your posts. Regenerate is always free.</p>
               </div>
             )}
           </div>
@@ -637,8 +635,9 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
           <div className="card form-card">
             <h3>Your 3 Posts</h3>
             <p className="form-hint" style={{ marginTop: 4 }}>
-              {aiImageUrl ? '✓ Nano Banana AI image — your product is preserved. ' : ''}
-              Click any text field to edit. Change accent colours below.
+              {aiImageUrl ? '✓ Nano Banana image — product preserved. ' : 'Using your photo. '}
+              Text is in dedicated zones — never overlapping the product.
+              Click any field to edit.
             </p>
           </div>
 
@@ -648,7 +647,10 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 11, color: 'var(--text-lo)' }}>{TEMPLATES[i].label}</span>
                 <input type="color" value={c}
-                  onChange={e => { const nc = [...accentColors]; nc[i] = e.target.value; setAccentColors(nc); setTimeout(() => renderCanvas(i), 80) }}
+                  onChange={e => {
+                    const nc = [...accentColors]; nc[i] = e.target.value; setAccentColors(nc)
+                    setTimeout(() => renderCanvas(i), 80)
+                  }}
                   style={{ width: 28, height: 28, border: 'none', borderRadius: 6, cursor: 'pointer', padding: 0 }} />
               </div>
             ))}
@@ -662,7 +664,8 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
                   {chosen === i && <span className="tag tag-electric">✓ Favourite</span>}
                 </div>
                 <div className="canvas-wrap" style={{ width: fmt.pw, height: fmt.ph }}>
-                  <canvas ref={el => { canvasRefs.current[i] = el; if (el) setTimeout(() => renderCanvas(i), 50) }}
+                  <canvas
+                    ref={el => { canvasRefs.current[i] = el; if (el) setTimeout(() => renderCanvas(i), 100 + i * 80) }}
                     width={fmt.pw} height={fmt.ph} className="post-canvas" />
                 </div>
                 <div className="edit-fields">
@@ -672,11 +675,13 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
                       {editing?.idx === i && editing?.field === field ? (
                         <div style={{ display: 'flex', gap: 6 }}>
                           <input value={editVal} onChange={e => setEditVal(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && saveEdit()} style={{ fontSize: 12, padding: '4px 8px' }} autoFocus />
+                            onKeyDown={e => e.key === 'Enter' && saveEdit()}
+                            style={{ fontSize: 12, padding: '4px 8px' }} autoFocus />
                           <button className="btn btn-primary" style={{ padding: '4px 10px', fontSize: 11 }} onClick={saveEdit}>✓</button>
                         </div>
                       ) : (
-                        <div className="edit-field-value" onClick={e => { e.stopPropagation(); startEdit(i, field, post[field]) }}>
+                        <div className="edit-field-value"
+                          onClick={e => { e.stopPropagation(); startEdit(i, field, post[field]) }}>
                           {post[field] ?? '—'} <Edit2 size={10} />
                         </div>
                       )}
