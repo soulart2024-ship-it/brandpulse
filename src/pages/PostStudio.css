@@ -72,3 +72,16 @@
 .scan-error{font-size:12px;color:var(--danger)}
 
 @media(max-width:768px){.posts-grid{grid-template-columns:1fr}}
+
+/* Claude Vision color analysis */
+.color-analysis-status { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--electric); padding:6px 0; }
+.color-analysis-result { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:11px; color:var(--success); padding:6px 0; }
+.color-swatches { display:flex; gap:4px; }
+.color-swatch { width:16px; height:16px; border-radius:4px; border:1px solid rgba(255,255,255,0.2); }
+.color-reasoning { font-size:10px; color:var(--text-lo); font-style:italic; width:100%; padding-top:2px; }
+
+.color-analysis-status{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--electric);padding:6px 0}
+.color-analysis-result{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--success);padding:6px 0}
+.color-swatches{display:flex;gap:4px}
+.color-swatch{width:16px;height:16px;border-radius:4px;border:1px solid rgba(255,255,255,0.2)}
+.color-reasoning{font-size:10px;color:var(--text-lo);font-style:italic;width:100%;padding-top:2px}
