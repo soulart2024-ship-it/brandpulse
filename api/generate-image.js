@@ -1,8 +1,13 @@
-// api/generate-image.js — Vercel serverless function
-// Supports three modes:
-//   text-to-image   — generate from prompt only (no product image)
-//   image-to-image  — place product photo into AI-generated scene (MAIN MODE)
-//   image-to-video  — animate a still image (for animated posts)
+// api/generate-image.js — Google Gemini (Nano Banana) image generation
+// Supports:
+//   mode: 'edit'   → your product photo + scene = Gemini keeps product, changes scene
+//   mode: 'create' → text-to-image background scene
+//
+// Image input can be:
+//   imageBase64 → base64 data URL from file upload
+//   imageUrl    → direct URL to product image (fetched server-side)
+//
+// Add GOOGLE_AI_KEY to Vercel Environment Variables
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -11,76 +16,93 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const falKey = process.env.FAL_KEY
-  if (!falKey) return res.status(500).json({ error: 'FAL_KEY not configured in Vercel' })
+  const apiKey = process.env.GOOGLE_AI_KEY
+  if (!apiKey) return res.status(500).json({ error: 'GOOGLE_AI_KEY not configured in Vercel' })
 
   try {
-    const { prompt, imageBase64, imageUrl, mode = 'text-to-image', image_size = 'square_hd', strength = 0.72 } = req.body
+    const { prompt, imageBase64, imageUrl, imageType = 'image/jpeg', productName, mode = 'create' } = req.body
     if (!prompt) return res.status(400).json({ error: 'Prompt required' })
 
-    let falUrl, falBody
+    let parts = []
 
-    if (mode === 'image-to-video') {
-      // Animate a still image using Kling
-      falUrl = 'https://fal.run/fal-ai/kling-video/v1.6/standard/image-to-video'
-      falBody = {
-        image_url: imageBase64 || imageUrl,
-        prompt,
-        duration: '5',
-        aspect_ratio: image_size === 'portrait_4_3' ? '9:16' : image_size === 'landscape_4_3' ? '16:9' : '1:1'
+    if (mode === 'edit') {
+      // Get image data — either from base64 upload OR by fetching URL server-side
+      let base64Data = null
+      let mimeType = imageType
+
+      if (imageBase64) {
+        // From file upload (already base64)
+        base64Data = imageBase64.replace(/^data:[^;]+;base64,/, '')
+        mimeType = imageBase64.match(/^data:([^;]+);/)?.[1] || imageType
+      } else if (imageUrl) {
+        // Fetch the image URL server-side — user can paste any product image URL
+        const imgRes = await fetch(imageUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BrandPulseBot/1.0)' }
+        })
+        if (!imgRes.ok) return res.status(502).json({ error: `Could not fetch image URL (${imgRes.status})` })
+        const buffer = await imgRes.arrayBuffer()
+        base64Data = Buffer.from(buffer).toString('base64')
+        mimeType = imgRes.headers.get('content-type')?.split(';')[0] || 'image/jpeg'
       }
-    } else if (mode === 'image-to-image' && (imageBase64 || imageUrl)) {
-      // Place product photo into AI scene — CORE FEATURE
-      // strength: 0.5 = close to original, 0.85 = heavily transformed
-      falUrl = 'https://fal.run/fal-ai/flux/dev/image-to-image'
-      falBody = {
-        image_url: imageBase64 || imageUrl,
-        prompt,
-        strength,
-        num_inference_steps: 28,
-        guidance_scale: 3.5,
-        num_images: 1,
-        enable_safety_checker: true,
-        image_size
-      }
+
+      if (!base64Data) return res.status(400).json({ error: 'Provide imageBase64 or imageUrl for edit mode' })
+
+      parts = [
+        {
+          text: `You are a professional commercial product photographer creating social media content.
+
+CRITICAL: Keep the ${productName ? `"${productName}"` : 'product'} in the uploaded photo EXACTLY as it appears. Preserve every single detail: the label text, brand name, colors, packaging shape, any logos or graphics on the product. Do NOT modify, alter, blur, or change the product itself in any way whatsoever.
+
+Your task: Naturally place this exact product into the following scene — ${prompt}
+
+The product should appear as if it genuinely belongs in this setting. Use professional commercial photography aesthetics: natural lighting, clean composition, aspirational lifestyle feel appropriate for social media.
+
+Output only the image.`
+        },
+        {
+          inline_data: {
+            mime_type: mimeType.startsWith('image/') ? mimeType : 'image/jpeg',
+            data: base64Data
+          }
+        }
+      ]
     } else {
-      // Text-to-image fallback (no product photo)
-      falUrl = 'https://fal.run/fal-ai/flux/schnell'
-      falBody = {
-        prompt,
-        image_size,
-        num_inference_steps: 4,
-        num_images: 1,
-        enable_safety_checker: true
-      }
+      // Text-to-image — create background/lifestyle scene only
+      parts = [{
+        text: `Professional commercial photography: ${prompt}. High quality, social media ready, clean composition, aspirational aesthetic, beautiful lighting, no text overlays.`
+      }]
     }
 
-    const response = await fetch(falUrl, {
+    const model = 'gemini-2.0-flash-preview-image-generation'
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+
+    const response = await fetch(endpoint, {
       method: 'POST',
-      headers: {
-        'Authorization': `Key ${falKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(falBody)
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
+      })
     })
 
     if (!response.ok) {
       const err = await response.text()
-      return res.status(response.status).json({ error: `Fal.ai error: ${err}` })
+      return res.status(response.status).json({ error: `Gemini API error: ${err}` })
     }
 
     const data = await response.json()
+    const imagePart = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData)
 
-    // Video returns differently from image
-    if (mode === 'image-to-video') {
-      const videoUrl = data.video?.url
-      if (!videoUrl) return res.status(500).json({ error: 'No video returned' })
-      return res.status(200).json({ url: videoUrl, type: 'video' })
+    if (!imagePart?.inlineData?.data) {
+      const textPart = data.candidates?.[0]?.content?.parts?.find(p => p.text)
+      return res.status(500).json({
+        error: textPart?.text || 'No image returned — check your GOOGLE_AI_KEY and model access'
+      })
     }
 
-    const imageResultUrl = data.images?.[0]?.url
-    if (!imageResultUrl) return res.status(500).json({ error: 'No image returned from Fal.ai' })
-    return res.status(200).json({ url: imageResultUrl, seed: data.seed, type: 'image' })
+    const mime = imagePart.inlineData.mimeType || 'image/png'
+    const dataUrl = `data:${mime};base64,${imagePart.inlineData.data}`
+    return res.status(200).json({ url: dataUrl, mode })
 
   } catch (err) {
     return res.status(500).json({ error: err.message })
