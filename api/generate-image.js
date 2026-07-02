@@ -73,7 +73,7 @@ Output only the image.`
       }]
     }
 
-    const model = 'gemini-2.0-flash-preview-image-generation'
+    const model = 'gemini-2.5-flash-image'
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
 
     const response = await fetch(endpoint, {
