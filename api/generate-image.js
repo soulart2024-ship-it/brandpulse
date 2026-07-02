@@ -1,9 +1,6 @@
 // api/generate-image.js — Fal.ai image generation
-//
-// mode: 'edit'   → Flux Kontext: keeps your product EXACTLY, changes the scene around it
-//                  Flux Kontext is specifically built for subject-preserving editing
-// mode: 'create' → Flux Schnell: text-to-image background scene
-//
+// mode: 'edit'   → Flux Kontext: keeps product exactly, changes scene
+// mode: 'create' → Flux Schnell: text-to-image background
 // FAL_KEY must be set in Vercel Environment Variables
 
 export default async function handler(req, res) {
@@ -21,50 +18,26 @@ export default async function handler(req, res) {
     if (!prompt) return res.status(400).json({ error: 'Prompt required' })
 
     if (mode === 'edit') {
-      // ── Step 1: Upload image to Fal.ai storage to get a public URL ──────────
-      let imageBuffer = null
-      let mimeType = imageType
+      // Get image as base64 data URL — Flux Kontext accepts this directly
+      let imageDataUrl = imageBase64
 
-      if (imageBase64) {
-        const base64Data = imageBase64.replace(/^data:[^;]+;base64,/, '')
-        mimeType = imageBase64.match(/^data:([^;]+);/)?.[1] || imageType
-        imageBuffer = Buffer.from(base64Data, 'base64')
-      } else if (imageUrl) {
+      if (!imageDataUrl && imageUrl) {
+        // Fetch from URL and convert to base64
         const imgRes = await fetch(imageUrl, {
           headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BrandPulseBot/1.0)' }
         })
         if (!imgRes.ok) return res.status(502).json({ error: `Could not fetch image (${imgRes.status})` })
-        const ab = await imgRes.arrayBuffer()
-        imageBuffer = Buffer.from(ab)
-        mimeType = imgRes.headers.get('content-type')?.split(';')[0] || 'image/jpeg'
+        const buffer = await imgRes.arrayBuffer()
+        const base64 = Buffer.from(buffer).toString('base64')
+        const mime = imgRes.headers.get('content-type')?.split(';')[0] || 'image/jpeg'
+        imageDataUrl = `data:${mime};base64,${base64}`
       }
 
-      if (!imageBuffer) return res.status(400).json({ error: 'No image provided for edit mode' })
+      if (!imageDataUrl) return res.status(400).json({ error: 'No image provided for edit mode' })
 
-      // Upload to Fal.ai storage
-      const uploadRes = await fetch('https://fal.run/files/upload', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Key ${falKey}`,
-          'Content-Type': mimeType,
-          'Content-Length': imageBuffer.length.toString()
-        },
-        body: imageBuffer
-      })
+      const kontextPrompt = `Keep the ${productName || 'product'} from the reference image EXACTLY as shown. Preserve every label, color, shape and packaging detail perfectly. Do not modify the product at all. Place it naturally in this setting: ${prompt}. Professional commercial photography, high quality, social media ready.`
 
-      if (!uploadRes.ok) {
-        const err = await uploadRes.text()
-        return res.status(500).json({ error: `Fal.ai upload failed: ${err}` })
-      }
-
-      const uploadData = await uploadRes.json()
-      const publicUrl = uploadData.url
-      if (!publicUrl) return res.status(500).json({ error: 'No URL returned from Fal.ai storage' })
-
-      // ── Step 2: Flux Kontext — keeps your product, changes the scene ─────────
-      // Flux Kontext is specifically designed for subject-preserving image editing
-      const kontextPrompt = `The ${productName || 'product'} from the reference image must remain EXACTLY as shown - preserve every detail of its labels, colors, shape, and packaging perfectly. Do not alter the product in any way. Place it naturally in this scene: ${prompt}. Professional commercial photography, high quality, social media ready.`
-
+      // Try Flux Kontext first — specifically built for subject-preserving editing
       const kontextRes = await fetch('https://fal.run/fal-ai/flux-pro/kontext', {
         method: 'POST',
         headers: {
@@ -73,51 +46,50 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           prompt: kontextPrompt,
-          image_url: publicUrl,
+          image_url: imageDataUrl,
           num_images: 1,
-          enable_safety_checker: true,
-          guidance_scale: 3.5,
-          num_inference_steps: 28
+          enable_safety_checker: true
         })
       })
 
-      if (!kontextRes.ok) {
-        const err = await kontextRes.text()
-        // Fallback: try flux/dev/image-to-image
-        const fallbackRes = await fetch('https://fal.run/fal-ai/flux/dev/image-to-image', {
-          method: 'POST',
-          headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            image_url: publicUrl,
-            prompt: kontextPrompt,
-            strength: 0.65,
-            num_inference_steps: 28,
-            guidance_scale: 3.5,
-            num_images: 1
-          })
-        })
-        if (!fallbackRes.ok) {
-          const fbErr = await fallbackRes.text()
-          return res.status(500).json({ error: `Image editing failed: ${fbErr}` })
-        }
-        const fbData = await fallbackRes.json()
-        const fbUrl = fbData.images?.[0]?.url
-        if (!fbUrl) return res.status(500).json({ error: 'No image from fallback model' })
-        return res.status(200).json({ url: fbUrl, mode, model: 'flux-dev-i2i' })
+      if (kontextRes.ok) {
+        const data = await kontextRes.json()
+        const url = data.images?.[0]?.url
+        if (url) return res.status(200).json({ url, mode, model: 'flux-kontext' })
       }
 
-      const kontextData = await kontextRes.json()
-      const resultUrl = kontextData.images?.[0]?.url
-      if (!resultUrl) return res.status(500).json({ error: 'No image returned from Flux Kontext' })
-      return res.status(200).json({ url: resultUrl, mode, model: 'flux-kontext' })
+      // Fallback: Flux Dev image-to-image
+      const fallbackRes = await fetch('https://fal.run/fal-ai/flux/dev/image-to-image', {
+        method: 'POST',
+        headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image_url: imageDataUrl,
+          prompt: kontextPrompt,
+          strength: 0.68,
+          num_inference_steps: 28,
+          guidance_scale: 3.5,
+          num_images: 1,
+          enable_safety_checker: true
+        })
+      })
+
+      if (!fallbackRes.ok) {
+        const err = await fallbackRes.text()
+        return res.status(500).json({ error: `Image editing failed: ${err}` })
+      }
+
+      const fbData = await fallbackRes.json()
+      const fbUrl = fbData.images?.[0]?.url
+      if (!fbUrl) return res.status(500).json({ error: 'No image returned' })
+      return res.status(200).json({ url: fbUrl, mode, model: 'flux-dev-i2i' })
 
     } else {
-      // ── Text-to-image: generate background scene (no product) ────────────────
+      // Text-to-image background scene
       const bgRes = await fetch('https://fal.run/fal-ai/flux/schnell', {
         method: 'POST',
         headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: `Professional lifestyle photography background: ${prompt}. High quality, social media ready, clean composition, beautiful lighting, no text, no watermarks.`,
+          prompt: `Professional lifestyle photography: ${prompt}. High quality, social media ready, clean composition, beautiful lighting, no text.`,
           image_size: 'square_hd',
           num_inference_steps: 4,
           num_images: 1,
