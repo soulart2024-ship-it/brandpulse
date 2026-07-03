@@ -71,6 +71,20 @@ export default function BrandBrain({ brand, onBrandUpdate }) {
     onBrandUpdate({ logo: resized })
   }
 
+  const updateColor = (idx, hex) => {
+    const next = [...(brand?.colors ?? [])]
+    next[idx] = hex
+    onBrandUpdate({ colors: next })
+  }
+
+  const removeColor = (idx) => {
+    onBrandUpdate({ colors: (brand?.colors ?? []).filter((_, i) => i !== idx) })
+  }
+
+  const addColor = () => {
+    onBrandUpdate({ colors: [...(brand?.colors ?? []), '#7C3AED'] })
+  }
+
   return (
     <div className="page">
       <div className="page-header">
@@ -123,7 +137,7 @@ export default function BrandBrain({ brand, onBrandUpdate }) {
 
       <div className="card form-card">
         <h3 style={{display:'flex',alignItems:'center',gap:8}}><Palette size={15}/> Brand Logo</h3>
-        <p className="form-hint">Upload once — auto-appears in Post Studio logo overlay. PNG with transparent background works best.</p>
+        <p className="form-hint">Upload once — auto-appears in Post Studio logo overlay. PNG with true transparent background works best.</p>
         <div style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
           {brand?.logo&&(
             <div style={{position:'relative'}}>
@@ -143,19 +157,26 @@ export default function BrandBrain({ brand, onBrandUpdate }) {
         {brand?.logo&&<p style={{fontSize:11,color:'var(--success)',marginTop:6}}>✓ Logo saved — auto-appears in Post Studio</p>}
       </div>
 
-      {brand?.colors?.length>0&&(
-        <div className="card form-card">
-          <h3>Brand Colours</h3>
-          <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-            {brand.colors.map((c,i)=>(
-              <div key={i} style={{display:'flex',alignItems:'center',gap:6}}>
-                <div style={{width:32,height:32,borderRadius:6,background:c,border:'1px solid var(--border)'}}/>
-                <span style={{fontSize:11,color:'var(--text-lo)',fontFamily:'monospace'}}>{c}</span>
+      <div className="card form-card">
+        <h3>Brand Colours</h3>
+        <p className="form-hint">Set your brand's colour palette — click a swatch to change it. In Post Studio you can choose brand colours or AI-matched image colours.</p>
+        <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'flex-start'}}>
+          {(brand?.colors ?? []).map((c, i) => (
+            <div key={i} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+              <div style={{position:'relative'}}>
+                <input type="color" value={c} onChange={e=>updateColor(i, e.target.value)}
+                  style={{width:44,height:44,border:'1px solid var(--border)',borderRadius:8,cursor:'pointer',padding:0}}/>
+                <button onClick={()=>removeColor(i)}
+                  style={{position:'absolute',top:-6,right:-6,background:'var(--danger)',border:'none',borderRadius:'50%',width:16,height:16,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontSize:9,lineHeight:1}}>×</button>
               </div>
-            ))}
-          </div>
+              <span style={{fontSize:10,color:'var(--text-lo)',fontFamily:'monospace'}}>{c}</span>
+            </div>
+          ))}
+          <button className="btn btn-secondary" style={{height:44,fontSize:12,padding:'0 14px',alignSelf:'flex-start'}} onClick={addColor}>
+            + Add Colour
+          </button>
         </div>
-      )}
+      </div>
 
       <div style={{display:'flex',justifyContent:'flex-end'}}>
         <button className="btn btn-primary" onClick={()=>{setSaved(true);setTimeout(()=>setSaved(false),2000)}} style={{padding:'10px 24px'}}>
