@@ -211,6 +211,7 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
   const [editing, setEditing] = useState(null)
   const [editVal, setEditVal] = useState('')
   const [accentColors, setAccentColors] = useState(TEMPLATES.map(t=>t.accent))
+  const [colorSource, setColorSource] = useState('ai') // 'ai' | 'brand'
 
   // Logo — auto-populate from Brand Brain logo
   const [logoOverrideUrl, setLogoOverrideUrl] = useState(null)
@@ -378,6 +379,19 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
 
   useEffect(() => { if(posts.length) posts.forEach((_,i)=>setTimeout(()=>renderCanvas(i),100+i*80)) }, [posts,renderCanvas])
   useEffect(() => { if(posts.length&&colorAnalysis) posts.forEach((_,i)=>setTimeout(()=>renderCanvas(i),50+i*60)) }, [accentColors])
+
+  useEffect(() => {
+    if (colorSource === 'brand' && brand?.colors?.length > 0) {
+      const bc = brand.colors
+      const cycled = TEMPLATES.map((_, i) => bc[i % bc.length])
+      setAccentColors(cycled)
+    } else if (colorSource === 'ai' && colorAnalysis?.accentColors) {
+      const ac = colorAnalysis.accentColors
+      const cycled = TEMPLATES.map((_, i) => ac[i % ac.length])
+      setAccentColors(cycled)
+    }
+  }, [colorSource, brand?.colors, colorAnalysis])
+
   useEffect(() => { if(posts.length) posts.forEach((_,i)=>setTimeout(()=>renderCanvas(i),50+i*50)) }, [showLogo,logoUrl,logoPosition,logoScale])
 
   const startEdit = (idx,field,current) => { setEditing({idx,field}); setEditVal(current??'') }
@@ -543,7 +557,23 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
 
           {/* Accent colors */}
           <div className="card" style={{display:'flex',gap:12,alignItems:'center',padding:'12px 16px',flexWrap:'wrap'}}>
-            <span style={{fontSize:12,color:'var(--text-mid)',fontFamily:'Space Grotesk',fontWeight:600}}>{colorAnalysis?'Claude-matched':'Accent'} Colours</span>
+            <span style={{fontSize:12,color:'var(--text-mid)',fontFamily:'Space Grotesk',fontWeight:600}}>Colour Source:</span>
+            <div style={{display:'flex',gap:4}}>
+              <button
+                className={`chip ${colorSource==='ai'?'chip-active':''}`}
+                style={{fontSize:11,padding:'5px 12px'}}
+                onClick={()=>setColorSource('ai')}
+                disabled={!colorAnalysis}
+                title={!colorAnalysis?'Generate a scene first to get AI-matched colours':''}
+              >AI-Matched</button>
+              <button
+                className={`chip ${colorSource==='brand'?'chip-active':''}`}
+                style={{fontSize:11,padding:'5px 12px'}}
+                onClick={()=>setColorSource('brand')}
+                disabled={!brand?.colors?.length}
+                title={!brand?.colors?.length?'Add brand colours in Brand Brain first':''}
+              >Brand Colours</button>
+            </div>
             {accentColors.slice(0,TEMPLATES.length).map((c,i)=>(
               <div key={i} style={{display:'flex',alignItems:'center',gap:4}}>
                 <span style={{fontSize:10,color:'var(--text-lo)'}}>{TEMPLATES[i].label.split(' ')[0]}</span>
