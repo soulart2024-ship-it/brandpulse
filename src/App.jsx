@@ -155,7 +155,7 @@ export default function App() {
   }
 
   return (
-    <div className="app-layout">
+    <div className="app-shell">
       <Sidebar
         current={sidebarCurrent}
         onNavigate={navigate}
