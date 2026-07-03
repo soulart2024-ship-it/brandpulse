@@ -313,10 +313,23 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
     setLoadingScenes(true); setScenes([]); setChosenScene(null)
     try {
       const productCtx = productInfo ? `Product: ${productInfo.name}. ${productInfo.description?.slice(0,80)}.` : ''
+      const angles = [
+        'in-hand lifestyle shot with a person interacting with the product',
+        'flat lay overhead styled composition with complementary props',
+        'outdoor natural setting - garden, beach, park, or golden hour light',
+        'editorial studio shot with bold color blocking or gradient backdrop',
+        'cozy indoor lifestyle - home, cafe, or workspace setting',
+        'seasonal or occasion-themed setting relevant to time of year',
+        'UGC-style candid shot that feels authentic and unposed',
+        'minimalist premium shot with negative space and soft shadows',
+        'active motion shot - gym, sport, movement context',
+        'bathroom vanity self-care ritual setting',
+      ]
+      const shuffled = [...angles].sort(() => Math.random() - 0.5).slice(0, 3)
       const result = await callClaude({
-        system:'Return JSON only: {"scenes":[{"label":"4 word label","prompt":"Detailed lifestyle setting for product photography. Describe environment, lighting, props. Very visual and specific.","mood":"one word"}]} — exactly 3 scenes.',
-        messages:[{role:'user',content:`Platform: ${platform}. ${productCtx} Brand: ${brand?.name??''}. Industry: ${brand?.industry??''}. Suggest 3 lifestyle scene backgrounds.`}],
-        max_tokens:600
+        system: 'You are a creative director for social media advertising specialising in diverse product photography concepts. Return JSON only: { "scenes": [{ "label": "4 word label", "prompt": "Highly detailed specific scene description for AI image generation - setting, lighting, mood, composition, camera angle, props. Be vivid and specific.", "mood": "one word" }] } - exactly 3 scenes, each meaningfully different.',
+        messages: [{ role:'user', content:`Platform: ${platform}. ${productCtx} Brand: ${brand?.name??''}. Industry: ${brand?.industry??''}. Generate 3 DIFFERENT scene concepts using these angles: 1. ${shuffled[0]} 2. ${shuffled[1]} 3. ${shuffled[2]}. Each must feel genuinely different in mood, setting and composition.` }],
+        max_tokens: 700
       })
       const parsed = extractJSON(result)
       setScenes(parsed.scenes??[])
