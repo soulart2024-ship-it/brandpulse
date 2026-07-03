@@ -23,48 +23,63 @@ const DEFAULT_BRAND = {
   tagline: ''
 }
 
-// ── localStorage helpers ──────────────────────────────────────────────────────
 function load(key, fallback) {
-  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback } catch { return fallback }
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback } 
+  catch { return fallback }
 }
+
 function save(key, val) {
-  try { localStorage.setItem(key, JSON.stringify(val)) } catch(e) { console.warn('Storage full', e) }
+  try { localStorage.setItem(key, JSON.stringify(val)) } 
+  catch(e) { console.warn('Storage full', e) }
+}
+
+// Safely load brands — handles both old array format and new object format
+function loadBrands() {
+  const saved = load('bp_brands', null)
+  if (!saved) return { 'brand-1': { ...DEFAULT_BRAND } }
+  // Old format was an array
+  if (Array.isArray(saved)) {
+    const obj = {}
+    saved.forEach(b => { if (b && b.id) obj[b.id] = { ...DEFAULT_BRAND, ...b } })
+    return Object.keys(obj).length > 0 ? obj : { 'brand-1': { ...DEFAULT_BRAND } }
+  }
+  // New format is an object
+  if (typeof saved === 'object' && saved !== null) {
+    // Ensure all brands have defaults merged in
+    const obj = {}
+    Object.entries(saved).forEach(([id, b]) => { obj[id] = { ...DEFAULT_BRAND, ...b } })
+    return Object.keys(obj).length > 0 ? obj : { 'brand-1': { ...DEFAULT_BRAND } }
+  }
+  return { 'brand-1': { ...DEFAULT_BRAND } }
 }
 
 export default function App() {
-  const [loggedIn, setLoggedIn]     = useState(() => load('bp_loggedIn', false))
-  const [current, setCurrent]       = useState('dashboard')
-  const [open, setOpen]             = useState(true)
+  const [loggedIn, setLoggedIn]           = useState(() => load('bp_loggedIn', false))
+  const [current, setCurrent]             = useState('dashboard')
+  const [open, setOpen]                   = useState(true)
   const [selectedTrend, setSelectedTrend] = useState(null)
+  const [brands, setBrands]               = useState(loadBrands)
+  const [activeBrandId, setActiveBrandId] = useState(() => {
+    const saved = load('bp_activeBrandId', 'brand-1')
+    return saved
+  })
+  const [allAssets, setAllAssets]         = useState(() => load('bp_allAssets', {}))
 
-  // brands = { id: { name, industry, tone, ... } }
-  const [brands, setBrands]         = useState(() => load('bp_brands', { 'brand-1': { ...DEFAULT_BRAND } }))
-  const [activeBrandId, setActiveBrandId] = useState(() => load('bp_activeBrandId', 'brand-1'))
-
-  // assets per brand = { brandId: [...assets] }
-  const [allAssets, setAllAssets]   = useState(() => load('bp_allAssets', {}))
-
-  // Ensure activeBrandId always has an entry
-  useEffect(() => {
-    if (!brands[activeBrandId]) {
-      const firstId = Object.keys(brands)[0]
-      if (firstId) setActiveBrandId(firstId)
-    }
-  }, [activeBrandId, brands])
-
-  // Persist
+  // Persist on change
+  useEffect(() => { save('bp_loggedIn', loggedIn) }, [loggedIn])
   useEffect(() => { save('bp_brands', brands) }, [brands])
   useEffect(() => { save('bp_activeBrandId', activeBrandId) }, [activeBrandId])
-  useEffect(() => { save('bp_loggedIn', loggedIn) }, [loggedIn])
 
-  const activeBrand = { ...DEFAULT_BRAND, ...(brands[activeBrandId] ?? {}) }
-  const assets = allAssets[activeBrandId] ?? []
+  // Ensure activeBrandId is valid
+  const validBrandId = brands[activeBrandId] ? activeBrandId : Object.keys(brands)[0] ?? 'brand-1'
+  const activeBrand = { ...DEFAULT_BRAND, ...(brands[validBrandId] ?? {}) }
+  const assets = allAssets[validBrandId] ?? []
 
   const setAssets = (updater) => {
     setAllAssets(prev => {
-      const current = prev[activeBrandId] ?? []
-      const next = typeof updater === 'function' ? updater(current) : updater
-      const updated = { ...prev, [activeBrandId]: next }
+      const cur = prev[validBrandId] ?? []
+      const next = typeof updater === 'function' ? updater(cur) : updater
+      const updated = { ...prev, [validBrandId]: next }
       save('bp_allAssets', updated)
       return updated
     })
@@ -73,7 +88,7 @@ export default function App() {
   const updateBrand = (updates) => {
     setBrands(prev => ({
       ...prev,
-      [activeBrandId]: { ...DEFAULT_BRAND, ...(prev[activeBrandId] ?? {}), ...updates }
+      [validBrandId]: { ...DEFAULT_BRAND, ...(prev[validBrandId] ?? {}), ...updates }
     }))
   }
 
@@ -93,23 +108,30 @@ export default function App() {
     }
   }
 
+  // Navigate handles BOTH sidebar short IDs ('studio') AND full page names ('post-studio')
   const navigate = (page, data) => {
-    // Map sidebar IDs to page IDs
     const pageMap = {
-      dashboard: 'dashboard',
-      brand:     'brand-brain',
-      assets:    'asset-library',
-      trends:    'trend-finder',
-      studio:    'post-studio',
-      video:     'video-hub',
-      calendar:  'calendar',
+      // Sidebar short IDs
+      'brand':   'brand-brain',
+      'assets':  'asset-library',
+      'trends':  'trend-finder',
+      'studio':  'post-studio',
+      'video':   'video-hub',
+      // Full page names pass through unchanged
+      'dashboard':     'dashboard',
+      'brand-brain':   'brand-brain',
+      'asset-library': 'asset-library',
+      'trend-finder':  'trend-finder',
+      'post-studio':   'post-studio',
+      'video-hub':     'video-hub',
+      'calendar':      'calendar',
     }
     const target = pageMap[page] ?? page
     if (data?.trend) setSelectedTrend(data.trend)
     setCurrent(target)
   }
 
-  // Map page names back to sidebar IDs for active state
+  // Map current page back to sidebar active ID
   const sidebarCurrent = {
     'dashboard':     'dashboard',
     'brand-brain':   'brand',
@@ -125,11 +147,11 @@ export default function App() {
   }
 
   const pageProps = {
-    brand: activeBrand,
-    onBrandUpdate: updateBrand,
+    brand:          activeBrand,
+    onBrandUpdate:  updateBrand,
     assets,
     onAssetsChange: setAssets,
-    onNavigate: navigate,
+    onNavigate:     navigate,
   }
 
   return (
@@ -141,19 +163,19 @@ export default function App() {
         onToggle={() => setOpen(v => !v)}
         brand={activeBrand}
         brands={brands}
-        activeBrandId={activeBrandId}
+        activeBrandId={validBrandId}
         onSwitchBrand={setActiveBrandId}
         onAddBrand={addBrand}
         onDeleteBrand={deleteBrand}
       />
       <main className="main-content">
-        {current === 'dashboard'     && <Dashboard {...pageProps} />}
-        {current === 'brand-brain'   && <BrandBrain {...pageProps} />}
-        {current === 'asset-library' && <AssetLibrary {...pageProps} />}
-        {current === 'trend-finder'  && <TrendFinder {...pageProps} />}
-        {current === 'post-studio'   && <PostStudio {...pageProps} selectedTrend={selectedTrend} />}
-        {current === 'video-hub'     && <VideoHub {...pageProps} />}
-        {current === 'calendar'      && <Calendar {...pageProps} />}
+        {current === 'dashboard'     && <Dashboard     {...pageProps} />}
+        {current === 'brand-brain'   && <BrandBrain    {...pageProps} />}
+        {current === 'asset-library' && <AssetLibrary  {...pageProps} />}
+        {current === 'trend-finder'  && <TrendFinder   {...pageProps} />}
+        {current === 'post-studio'   && <PostStudio    {...pageProps} selectedTrend={selectedTrend} />}
+        {current === 'video-hub'     && <VideoHub      {...pageProps} />}
+        {current === 'calendar'      && <Calendar      {...pageProps} />}
       </main>
     </div>
   )
