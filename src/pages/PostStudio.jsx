@@ -94,7 +94,7 @@ function drawBrightStrip(ctx, w, h, img, post, brand, accent, logoImg, logoPos, 
   ctx.fillText((brand?.industry??'').toUpperCase().slice(0,20),w/2,stripY+stripH*0.2)
   ctx.fillStyle='#FFF';fitLine(ctx,post.headline??'',w/2,stripY+stripH*0.47,tw,Math.max(12,stripH*0.24),'800')
   ctx.fillStyle='rgba(255,255,255,0.8)';fitSubtext(ctx,post.subtext??'',w/2,stripY+stripH*0.67,tw,stripH*0.14,Math.max(8,stripH*0.12))
-  if(!logoImg){ctx.fillStyle='rgba(255,255,255,0.45)';ctx.textAlign='right';ctx.font=`600 ${Math.max(6,h*0.028)}px "Space Grotesk",sans-serif`;ctx.fillText(brand?.name??'',w-8,h-6)}
+  
   drawLogo(ctx,w,h,logoImg,logoPos,logoScale)
 }
 
@@ -112,7 +112,7 @@ function drawDarkStrip(ctx, w, h, img, post, brand, accent, logoImg, logoPos, lo
   // CTA as text only — no pill that overflows
   ctx.fillStyle=accent;ctx.textAlign='left';ctx.font=`700 ${Math.max(8,stripH*0.14)}px "Space Grotesk",sans-serif`
   ctx.fillText('→ '+(post.cta??'Learn More'),kx,stripY+stripH*0.84)
-  if(!logoImg){ctx.fillStyle='rgba(255,255,255,0.7)';ctx.textAlign='right';ctx.font=`600 ${Math.max(6,h*0.028)}px "Space Grotesk",sans-serif`;ctx.fillText(brand?.name??'',w-8,18)}
+  
   drawLogo(ctx,w,h,logoImg,logoPos,logoScale)
 }
 
@@ -126,7 +126,7 @@ function drawDuoStrip(ctx, w, h, img, post, brand, accent, logoImg, logoPos, log
   ctx.fillStyle='#FFF';fitLine(ctx,post.headline??'',w/2,stripY+stripH*0.36,tw,Math.max(12,stripH*0.26),'800')
   ctx.fillStyle='rgba(255,255,255,0.7)';fitSubtext(ctx,post.subtext??'',w/2,stripY+stripH*0.57,tw,stripH*0.14,Math.max(8,stripH*0.12))
   ctx.fillStyle=accent;ctx.textAlign='center';ctx.font=`700 ${Math.max(7,stripH*0.13)}px "Space Grotesk",sans-serif`;ctx.fillText((post.cta??'Learn More').toUpperCase(),w/2,stripY+stripH*0.83)
-  if(!logoImg){ctx.fillStyle='rgba(255,255,255,0.4)';ctx.textAlign='right';ctx.font=`600 ${Math.max(6,h*0.027)}px "Space Grotesk",sans-serif`;ctx.fillText(brand?.name??'',w-8,h-6)}
+  
   drawLogo(ctx,w,h,logoImg,logoPos,logoScale)
 }
 
@@ -149,7 +149,7 @@ function drawBoldOverlay(ctx, w, h, img, post, brand, accent, logoImg, logoPos, 
   ctx.fillStyle=accent;ctx.font=`700 ${Math.max(8,h*0.038)}px "Space Grotesk",sans-serif`;ctx.textAlign='center'
   ctx.fillText((post.cta??'Learn More').toUpperCase(),w/2,h*0.72)
   // Brand
-  if(!logoImg){ctx.fillStyle='rgba(255,255,255,0.7)';ctx.textAlign='left';ctx.font=`600 ${Math.max(7,h*0.03)}px "Space Grotesk",sans-serif`;ctx.fillText(brand?.name??'',12,20)}
+  
   drawLogo(ctx,w,h,logoImg,logoPos,logoScale)
 }
 
@@ -172,7 +172,7 @@ function drawGradientFrame(ctx, w, h, img, post, brand, accent, logoImg, logoPos
   const ctaW=Math.min(tw*0.55,120),ctaH=Math.max(18,stripH*0.18),ctaX=(w-ctaW)/2,ctaY=stripY+stripH*0.78
   ctx.fillStyle=accent;ctx.beginPath();ctx.roundRect(ctaX,ctaY,ctaW,ctaH,ctaH/2);ctx.fill()
   ctx.fillStyle='#FFF';fitLine(ctx,post.cta??'Learn More',(w)/2,ctaY+ctaH*0.67,ctaW-10,Math.max(7,ctaH*0.46),'700')
-  if(!logoImg){ctx.fillStyle='rgba(255,255,255,0.5)';ctx.textAlign='right';ctx.font=`600 ${Math.max(6,h*0.028)}px "Space Grotesk",sans-serif`;ctx.fillText(brand?.name??'',w-8,h-6)}
+  
   drawLogo(ctx,w,h,logoImg,logoPos,logoScale)
 }
 
