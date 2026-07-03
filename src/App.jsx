@@ -72,7 +72,7 @@ export default function App() {
 
   // Ensure activeBrandId is valid
   const validBrandId = brands[activeBrandId] ? activeBrandId : Object.keys(brands)[0] ?? 'brand-1'
-  const activeBrand = { ...DEFAULT_BRAND, ...(brands[validBrandId] ?? {}) }
+  const activeBrand = Object.fromEntries(Object.entries({ ...DEFAULT_BRAND, ...(brands[validBrandId] ?? {}) }).map(([k,v]) => [k, v ?? DEFAULT_BRAND[k]]))
   const assets = allAssets[validBrandId] ?? []
 
   const setAssets = (updater) => {
