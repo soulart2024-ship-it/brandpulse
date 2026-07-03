@@ -19,12 +19,11 @@ const DEFAULT_BRAND = {
   tone: 'friendly',
   description: '',
   website: '',
-  logo: null, // URL or base64
+  logo: null,
   colors: [],
-  createdAt: Date.now()
+  tagline: ''
 }
 
-// ── localStorage helpers ──────────────────────────────────────────────────────
 function loadFromStorage(key, fallback) {
   try {
     const val = localStorage.getItem(key)
@@ -33,27 +32,32 @@ function loadFromStorage(key, fallback) {
 }
 
 function saveToStorage(key, val) {
-  try { localStorage.setItem(key, JSON.stringify(val)) } catch(e) { console.warn('localStorage full:', e) }
+  try { localStorage.setItem(key, JSON.stringify(val)) } catch(e) { console.warn('Storage full', e) }
 }
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(() => loadFromStorage('bp_loggedIn', false))
   const [currentPage, setCurrentPage] = useState('dashboard')
-  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [selectedTrend, setSelectedTrend] = useState(null)
 
-  // ── Brands — persisted per brand, brand-specific assets ───────────────────
-  const [brands, setBrands] = useState(() => loadFromStorage('bp_brands', [DEFAULT_BRAND]))
-  const [activeBrandId, setActiveBrandId] = useState(() => loadFromStorage('bp_activeBrandId', 'brand-1'))
+  // Brands — persisted, with safe defaults merged in
+  const [brands, setBrands] = useState(() => {
+    const saved = loadFromStorage('bp_brands', null)
+    if (!saved) return [{ ...DEFAULT_BRAND }]
+    return saved.map(b => ({ ...DEFAULT_BRAND, ...b }))
+  })
+  const [activeBrandId, setActiveBrandId] = useState(() =>
+    loadFromStorage('bp_activeBrandId', 'brand-1')
+  )
 
-  // ── Assets — stored per brand ─────────────────────────────────────────────
-  const [allAssets, setAllAssets] = useState(() => loadFromStorage('bp_allAssets', {}))
+  // Assets per brand
+  const [allAssets, setAllAssets] = useState(() =>
+    loadFromStorage('bp_allAssets', {})
+  )
 
-  // Active brand object
-  const activeBrand = brands.find(b => b.id === activeBrandId) ?? brands[0]
-
-  // Assets for the active brand only
+  const activeBrand = brands.find(b => b.id === activeBrandId) ?? { ...DEFAULT_BRAND, ...brands[0] }
   const assets = allAssets[activeBrandId] ?? []
+
   const setAssets = (updater) => {
     setAllAssets(prev => {
       const current = prev[activeBrandId] ?? []
@@ -64,26 +68,21 @@ export default function App() {
     })
   }
 
-  // Persist brands
+  // Persist on change
   useEffect(() => { saveToStorage('bp_brands', brands) }, [brands])
   useEffect(() => { saveToStorage('bp_activeBrandId', activeBrandId) }, [activeBrandId])
   useEffect(() => { saveToStorage('bp_loggedIn', loggedIn) }, [loggedIn])
 
   const updateBrand = (updates) => {
-    setBrands(prev => prev.map(b => b.id === activeBrandId ? { ...b, ...updates } : b))
+    setBrands(prev => prev.map(b =>
+      b.id === activeBrandId ? { ...b, ...updates } : b
+    ))
   }
 
   const addBrand = () => {
-    const newBrand = { ...DEFAULT_BRAND, id: 'brand-' + Date.now(), name: 'New Brand', createdAt: Date.now() }
-    setBrands(prev => [...prev, newBrand])
-    setActiveBrandId(newBrand.id)
-  }
-
-  const deleteBrand = (id) => {
-    if (brands.length <= 1) return
-    setBrands(prev => prev.filter(b => b.id !== id))
-    setAllAssets(prev => { const n = {...prev}; delete n[id]; return n })
-    if (activeBrandId === id) setActiveBrandId(brands.find(b => b.id !== id)?.id ?? brands[0].id)
+    const nb = { ...DEFAULT_BRAND, id: 'brand-' + Date.now(), name: 'New Brand' }
+    setBrands(prev => [...prev, nb])
+    setActiveBrandId(nb.id)
   }
 
   const navigate = (page, data) => {
@@ -107,16 +106,13 @@ export default function App() {
     <div className="app-layout">
       <Sidebar
         currentPage={currentPage}
-        onNavigate={page => setCurrentPage(page)}
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(v => !v)}
+        onNavigate={navigate}
         brands={brands}
         activeBrandId={activeBrandId}
-        onBrandSwitch={setActiveBrandId}
+        onBrandSwitch={id => setActiveBrandId(id)}
         onAddBrand={addBrand}
-        onDeleteBrand={deleteBrand}
       />
-      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
+      <main className="main-content">
         {currentPage === 'dashboard'     && <Dashboard {...pageProps} />}
         {currentPage === 'brand-brain'   && <BrandBrain {...pageProps} />}
         {currentPage === 'asset-library' && <AssetLibrary {...pageProps} />}
