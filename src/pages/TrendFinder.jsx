@@ -1,102 +1,113 @@
 import { useState } from 'react'
-import { TrendingUp, Search, Sparkles, ArrowRight } from 'lucide-react'
-import { callClaude } from '../lib/api.js'
+import { TrendingUp, Search, ArrowRight, RefreshCw, Zap } from 'lucide-react'
+import { callClaude, extractJSON } from '../lib/api.js'
 import './Page.css'
 import './TrendFinder.css'
 
-const PLATFORMS = ['Instagram', 'TikTok', 'LinkedIn', 'YouTube', 'Facebook', 'Pinterest', 'X (Twitter)']
+const PLATFORMS = ['Instagram','TikTok','LinkedIn','YouTube','Facebook','Pinterest','X (Twitter)']
 
-export default function TrendFinder({ brand, onSelectTrend }) {
+export default function TrendFinder({ brand, onNavigate }) {
   const [platform, setPlatform] = useState('Instagram')
-  const [niche, setNiche] = useState(brand?.industry ?? '')
+  const [topic, setTopic] = useState('')
   const [loading, setLoading] = useState(false)
-  const [results, setResults] = useState(null)
+  const [trends, setTrends] = useState([])
+  const [error, setError] = useState('')
 
   const findTrends = async () => {
-    setLoading(true)
-    setResults(null)
+    setLoading(true); setTrends([]); setError('')
     try {
-      const text = await callClaude({
-        system: 'You are a social media trend analyst. Return JSON only: { "trends": [{ "title": "...", "description": "...", "format": "Reel/Carousel/Story/Static Post", "hook": "...", "hashtags": ["..."], "contentIdeas": ["idea1","idea2","idea3"] }] } — 5 trends, no markdown.',
-        messages: [{ role: 'user', content: `Find trending content ideas for ${platform} in the ${niche || 'general'} niche. Brand tone: ${brand?.tone ?? 'professional'}.` }],
+      const brandCtx = brand?.name ? `Brand: ${brand.name}. Industry: ${brand.industry || 'health & wellness'}.` : ''
+      const topicCtx = topic || brand?.industry || 'health and wellness'
+
+      const result = await callClaude({
+        system: 'You are a social media trend analyst. Search for current trending content formats and hooks. Return JSON only, no markdown: { "trends": [{ "title": "trend name", "hook": "example opening hook for this trend", "format": "content format description", "why": "why this is trending now", "example": "example post idea for this brand" }] } — exactly 5 trends.',
+        messages: [{ role: 'user', content: `Find the top 5 trending content formats and hooks on ${platform} right now for ${topicCtx}. ${brandCtx} Focus on what is actually getting high engagement and views this week. Include specific hook examples.` }],
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
         max_tokens: 1500
       })
-      const clean = text.replace(/```json|```/g, '').trim()
-      const parsed = JSON.parse(clean)
-      setResults(parsed.trends.map(t => ({ ...t, platform })))
-    } catch {
-      setResults([{ title: 'Try again', description: 'Could not fetch trends — check API key.', format: '—', hook: '—', hashtags: [], contentIdeas: [], platform }])
+
+      const parsed = extractJSON(result)
+      if (parsed.trends?.length > 0) {
+        setTrends(parsed.trends)
+      } else {
+        setError('No trends found — try a different topic or platform.')
+      }
+    } catch(e) {
+      setError('Could not fetch trends. Please try again.')
+      console.error(e)
     }
     setLoading(false)
+  }
+
+  const useTrend = (trend) => {
+    if (onNavigate) onNavigate('post-studio', { trend: { ...trend, platform } })
   }
 
   return (
     <div className="page">
       <div className="page-header">
-        <TrendingUp size={24} className="page-icon-rose" />
-        <div>
-          <h2>Trend Finder</h2>
-          <p>Find what's trending — then click "Use This Trend" to create your post in Post Studio.</p>
-        </div>
+        <TrendingUp size={24} className="page-icon-violet"/>
+        <div><h2>Trend Finder</h2><p>Find what's trending — then click "Use This Trend" to create your post in Post Studio.</p></div>
       </div>
 
       <div className="card form-card">
         <h3>Search Trends</h3>
         <div className="chip-grid" style={{marginBottom:12}}>
-          {PLATFORMS.map(p => (
-            <button key={p} className={`chip ${platform === p ? 'chip-active' : ''}`} onClick={() => setPlatform(p)}>{p}</button>
-          ))}
+          {PLATFORMS.map(p=><button key={p} className={`chip ${platform===p?'chip-active':''}`} onClick={()=>setPlatform(p)}>{p}</button>)}
         </div>
         <div className="scan-row">
-          <input value={niche} onChange={e => setNiche(e.target.value)} placeholder="Your niche e.g. wellness, kinesiology, fashion..." />
+          <input value={topic} onChange={e=>setTopic(e.target.value)}
+            placeholder={`e.g. ${brand?.industry||'Health Food and Natural Supplements Retail'}`}
+            onKeyDown={e=>e.key==='Enter'&&findTrends()}/>
           <button className="btn btn-primary" onClick={findTrends} disabled={loading}>
-            {loading ? <span className="spinner" /> : <><Search size={14} /> Find Trends</>}
+            {loading?<><span className="spinner"/> Finding…</>:<><Search size={14}/> Find Trends</>}
           </button>
         </div>
+        {error&&<p style={{fontSize:12,color:'var(--danger)',marginTop:8}}>{error}</p>}
       </div>
 
-      {loading && (
-        <div className="card" style={{textAlign:'center', padding:40}}>
-          <Sparkles size={28} style={{color:'var(--violet-mid)', margin:'0 auto 12px'}} />
-          <p style={{color:'var(--text-mid)'}}>Analysing {platform} trends…</p>
+      {loading&&(
+        <div className="card" style={{display:'flex',alignItems:'center',gap:12,padding:24}}>
+          <span className="spinner"/>
+          <span style={{fontSize:13,color:'var(--text-mid)'}}>Searching {platform} for trending content in your industry…</span>
         </div>
       )}
 
-      {results && (
-        <div className="trends-list">
-          {results.map((t, i) => (
-            <div key={i} className="card trend-card animate-slide-up" style={{animationDelay:`${i*60}ms`}}>
+      {trends.length>0&&(
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          {trends.map((trend,i)=>(
+            <div key={i} className="card trend-card">
               <div className="trend-header">
-                <span className="tag tag-rose">#{i + 1}</span>
-                <span className="tag tag-electric">{t.format}</span>
-                <span className="tag tag-violet">{t.platform}</span>
+                <div className="trend-rank">#{i+1}</div>
+                <div className="trend-platform-badge">{platform}</div>
+                <h3 className="trend-title">{trend.title}</h3>
               </div>
-              <h3 className="trend-title">{t.title}</h3>
-              <p className="trend-desc">{t.description}</p>
-              <div className="trend-hook">
-                <span className="trend-label">Hook</span>
-                <span>{t.hook}</span>
-              </div>
-              {t.contentIdeas?.length > 0 && (
-                <div className="trend-ideas">
-                  <span className="trend-label">Content ideas</span>
-                  <ul>
-                    {t.contentIdeas.map((idea, j) => <li key={j}>{idea}</li>)}
-                  </ul>
+
+              {trend.hook&&(
+                <div className="trend-hook">
+                  <span className="trend-hook-label">HOOK</span>
+                  <span className="trend-hook-text">"{trend.hook}"</span>
                 </div>
               )}
-              {t.hashtags?.length > 0 && (
-                <div className="trend-tags">
-                  {t.hashtags.map(h => <span key={h} className="tag tag-violet">{h.startsWith('#') ? h : '#'+h}</span>)}
+
+              {trend.format&&<p className="trend-format"><strong>Format:</strong> {trend.format}</p>}
+              {trend.why&&<p className="trend-why"><Zap size={12}/> {trend.why}</p>}
+              {trend.example&&(
+                <div className="trend-example">
+                  <p style={{fontSize:11,color:'var(--text-lo)',marginBottom:4,fontWeight:600}}>POST IDEA FOR {brand?.name?.toUpperCase()||'YOUR BRAND'}</p>
+                  <p style={{fontSize:12,color:'var(--text-hi)',lineHeight:1.5}}>{trend.example}</p>
                 </div>
               )}
-              {onSelectTrend && (
-                <button className="btn btn-primary use-trend-btn" onClick={() => onSelectTrend(t)}>
-                  Use This Trend in Post Studio <ArrowRight size={15} />
-                </button>
-              )}
+
+              <button className="btn btn-primary" style={{alignSelf:'flex-start',marginTop:4}} onClick={()=>useTrend(trend)}>
+                Use This Trend in Post Studio <ArrowRight size={14}/>
+              </button>
             </div>
           ))}
+
+          <button className="btn btn-secondary" style={{alignSelf:'flex-start'}} onClick={findTrends}>
+            <RefreshCw size={14}/> Find More Trends
+          </button>
         </div>
       )}
     </div>
