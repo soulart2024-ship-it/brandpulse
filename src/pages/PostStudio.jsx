@@ -82,7 +82,7 @@ function drawLogo(ctx, w, h, logoImg, position, scale) {
   ctx.drawImage(logoImg, x, y, logoW, logoH)
 }
 
-const DEFAULT_TEXT_SIZES = { headline: 1, subtext: 1 }
+const DEFAULT_TEXT_SIZES = { headline: 1, subtext: 1, cta: 1 }
 
 // ── TEMPLATE 1: Bright Strip ──────────────────────────────────────────────────
 function drawBrightStrip(ctx, w, h, img, post, brand, accent, logoImg, logoPos, logoScale, sizes=DEFAULT_TEXT_SIZES) {
@@ -112,7 +112,7 @@ function drawDarkStrip(ctx, w, h, img, post, brand, accent, logoImg, logoPos, lo
   ctx.fillStyle='#FFF';fitLine(ctx,post.headline??'',kx,stripY+stripH*0.40,tw,Math.max(12,stripH*0.22)*(sizes?.headline??1),'700','left');ctx.textAlign='left'
   ctx.fillStyle='rgba(255,255,255,0.72)';fitSubtext(ctx,post.subtext??'',kx,stripY+stripH*0.60,tw,stripH*0.13*(sizes?.subtext??1),Math.max(8,stripH*0.11)*(sizes?.subtext??1),'left')
   // CTA as text only — no pill that overflows
-  ctx.fillStyle=accent;ctx.textAlign='left';ctx.font=`700 ${Math.max(8,stripH*0.14)}px "Space Grotesk",sans-serif`
+  ctx.fillStyle=accent;ctx.textAlign='left';ctx.font=`700 ${Math.max(8,stripH*0.14)*(sizes?.cta??1)}px "Space Grotesk",sans-serif`
   ctx.fillText('→ '+(post.cta??'Learn More'),kx,stripY+stripH*0.84)
   
   drawLogo(ctx,w,h,logoImg,logoPos,logoScale)
@@ -127,7 +127,7 @@ function drawDuoStrip(ctx, w, h, img, post, brand, accent, logoImg, logoPos, log
   ctx.fillStyle='#1a0f3a';ctx.fillRect(0,stripY,w,stripH);ctx.fillStyle=accent;ctx.fillRect(0,stripY,w,3)
   ctx.fillStyle='#FFF';fitLine(ctx,post.headline??'',w/2,stripY+stripH*0.36,tw,Math.max(12,stripH*0.26)*(sizes?.headline??1),'800')
   ctx.fillStyle='rgba(255,255,255,0.7)';fitSubtext(ctx,post.subtext??'',w/2,stripY+stripH*0.57,tw,stripH*0.14*(sizes?.subtext??1),Math.max(8,stripH*0.12)*(sizes?.subtext??1))
-  ctx.fillStyle=accent;ctx.textAlign='center';ctx.font=`700 ${Math.max(7,stripH*0.13)}px "Space Grotesk",sans-serif`;ctx.fillText((post.cta??'Learn More').toUpperCase(),w/2,stripY+stripH*0.83)
+  ctx.fillStyle=accent;ctx.textAlign='center';ctx.font=`700 ${Math.max(7,stripH*0.13)*(sizes?.cta??1)}px "Space Grotesk",sans-serif`;ctx.fillText((post.cta??'Learn More').toUpperCase(),w/2,stripY+stripH*0.83)
   
   drawLogo(ctx,w,h,logoImg,logoPos,logoScale)
 }
@@ -148,7 +148,7 @@ function drawBoldOverlay(ctx, w, h, img, post, brand, accent, logoImg, logoPos, 
   // Subtext below bar
   ctx.fillStyle='rgba(255,255,255,0.75)';fitSubtext(ctx,post.subtext??'',w/2,h*0.59,tw,h*0.046*(sizes?.subtext??1),Math.max(9,h*0.038)*(sizes?.subtext??1))
   // CTA
-  ctx.fillStyle=accent;ctx.font=`700 ${Math.max(8,h*0.038)}px "Space Grotesk",sans-serif`;ctx.textAlign='center'
+  ctx.fillStyle=accent;ctx.font=`700 ${Math.max(8,h*0.038)*(sizes?.cta??1)}px "Space Grotesk",sans-serif`;ctx.textAlign='center'
   ctx.fillText((post.cta??'Learn More').toUpperCase(),w/2,h*0.72)
   // Brand
   
@@ -173,7 +173,7 @@ function drawGradientFrame(ctx, w, h, img, post, brand, accent, logoImg, logoPos
   // CTA pill
   const ctaW=Math.min(tw*0.55,120),ctaH=Math.max(18,stripH*0.18),ctaX=(w-ctaW)/2,ctaY=stripY+stripH*0.78
   ctx.fillStyle=accent;ctx.beginPath();ctx.roundRect(ctaX,ctaY,ctaW,ctaH,ctaH/2);ctx.fill()
-  ctx.fillStyle='#FFF';fitLine(ctx,post.cta??'Learn More',(w)/2,ctaY+ctaH*0.67,ctaW-10,Math.max(7,ctaH*0.46),'700')
+  ctx.fillStyle='#FFF';fitLine(ctx,post.cta??'Learn More',(w)/2,ctaY+ctaH*0.67,ctaW-10,Math.max(7,ctaH*0.46)*(sizes?.cta??1),'700')
   
   drawLogo(ctx,w,h,logoImg,logoPos,logoScale)
 }
@@ -664,6 +664,12 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
                     <input type="range" min="0.6" max="1.6" step="0.05"
                       value={getSizes(i).subtext}
                       onChange={e=>setSize(i,'subtext',parseFloat(e.target.value))}/>
+                  </div>
+                  <div className="size-slider-row">
+                    <span className="size-slider-label">CTA size</span>
+                    <input type="range" min="0.6" max="1.6" step="0.05"
+                      value={getSizes(i).cta}
+                      onChange={e=>setSize(i,'cta',parseFloat(e.target.value))}/>
                   </div>
                 </div>
                 <div className="post-copy">
