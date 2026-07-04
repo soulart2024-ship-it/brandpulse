@@ -188,6 +188,7 @@ const TEMPLATES = [
 
 export default function PostStudio({ brand, assets, onAssetsChange, selectedTrend, onNavigate }) {
   const [step, setStep] = useState(0)
+  const [productType, setProductType] = useState('physical') // 'physical' | 'digital'
   const [productUrl, setProductUrl] = useState('')
   const [productQuery, setProductQuery] = useState('')
   const [productInfo, setProductInfo] = useState(null)
@@ -320,9 +321,18 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
     try {
       const productCtx = productInfo ? `Product: ${productInfo.name}. ${productInfo.description?.slice(0,100)}.` : `Brand: ${brand?.name??''}, Industry: ${brand?.industry??''}`
       const seed = Math.floor(Math.random() * 100000)
+
+      const systemPrompt = productType === 'digital'
+        ? 'You are a creative director for digital app/service marketing. Search for current trending visual styles for app and digital service marketing on the specified platform. Propose 3 OUTCOME-FOCUSED lifestyle scene concepts that represent the FEELING or RESULT of using this app/service - NOT literal screenshots or device mockups. Show a person experiencing the benefit (e.g. calm, focused, organised, connected) in a real-world setting. Return JSON only: { "scenes": [{ "label": "4 word label", "prompt": "Highly detailed lifestyle scene description - a person in a real setting experiencing the outcome/benefit of this app, NO phone screens or UI shown, focus on emotion and environment", "mood": "one word", "trendSource": "brief note on trend basis" }] } - exactly 3 scenes, genuinely different from each other.'
+        : 'You are a creative director for social media advertising. Search for current real trending visual styles and content formats on the specified platform for this product category. Then propose 3 scene concepts inspired by what is ACTUALLY trending right now - not generic stock photo ideas. Return JSON only: { "scenes": [{ "label": "4 word label", "prompt": "Highly detailed specific scene description for AI image generation including setting, lighting, camera angle, composition style, and what makes it feel current/trending right now", "mood": "one word", "trendSource": "brief note on what real trend this is based on" }] } - exactly 3 scenes, each based on a DIFFERENT current trend, genuinely different from each other in setting and mood.'
+
+      const userPrompt = productType === 'digital'
+        ? `Platform: ${platform}. ${productCtx}. This is a digital app/service. Search for trending lifestyle/wellness/productivity content styles on ${platform} right now. Suggest 3 scenes showing the OUTCOME of using this app - real people, real settings, no screens shown. Variation seed: ${seed}.`
+        : `Platform: ${platform}. ${productCtx}. Search for what visual content styles are actually trending on ${platform} right now for this type of product/industry in 2026. Base your 3 scene suggestions on real current trends, not generic ideas. Variation seed: ${seed}.`
+
       const result = await callClaude({
-        system: 'You are a creative director for social media advertising. Search for current real trending visual styles and content formats on the specified platform for this product category. Then propose 3 scene concepts inspired by what is ACTUALLY trending right now - not generic stock photo ideas. Return JSON only: { "scenes": [{ "label": "4 word label", "prompt": "Highly detailed specific scene description for AI image generation including setting, lighting, camera angle, composition style, and what makes it feel current/trending right now", "mood": "one word", "trendSource": "brief note on what real trend this is based on" }] } - exactly 3 scenes, each based on a DIFFERENT current trend, genuinely different from each other in setting and mood.',
-        messages: [{ role:'user', content:`Platform: ${platform}. ${productCtx}. Search for what visual content styles are actually trending on ${platform} right now for this type of product/industry in 2026. Base your 3 scene suggestions on real current trends, not generic ideas. Variation seed: ${seed}.` }],
+        system: systemPrompt,
+        messages: [{ role:'user', content: userPrompt }],
         tools: [{ type:'web_search_20250305', name:'web_search' }],
         max_tokens: 900
       })
@@ -334,7 +344,7 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
   }
 
   const generateAiImage = async () => {
-    const hasPhoto = photo || photoUrl
+    const hasPhoto = (photo || photoUrl) && productType === 'physical'
     setGeneratingAI(true); setAiImageUrl(null); setAiError(''); setColorAnalysis(null)
     try {
       const prompt = customScene || scenes[chosenScene]?.prompt || 'professional lifestyle photography, clean natural light'
@@ -442,7 +452,23 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
       {step===0&&(
         <div className="studio-step animate-slide-up">
           <div className="card form-card">
-            <h3 style={{display:'flex',alignItems:'center',gap:8}}><Link size={15}/> Paste product page URL</h3>
+            <h3>What are you promoting?</h3>
+            <div className="product-type-toggle">
+              <button className={`product-type-btn ${productType==='physical'?'active':''}`} onClick={()=>setProductType('physical')}>
+                <Package size={18}/>
+                <span>Physical Product</span>
+                <p>Real photo, AI-enhanced scene</p>
+              </button>
+              <button className={`product-type-btn ${productType==='digital'?'active':''}`} onClick={()=>setProductType('digital')}>
+                <Sparkles size={18}/>
+                <span>Digital App / Service</span>
+                <p>No photo needed — AI generates lifestyle scenes</p>
+              </button>
+            </div>
+          </div>
+
+          <div className="card form-card">
+            <h3 style={{display:'flex',alignItems:'center',gap:8}}><Link size={15}/> Paste {productType==='digital'?'app / website':'product page'} URL</h3>
             <p className="form-hint">Reads the real page — name, benefits, ingredients extracted automatically.</p>
             <div className="scan-row">
               <input value={productUrl} onChange={e=>setProductUrl(e.target.value)} placeholder="https://heatherandroseh.co.uk/product/nac-600" onKeyDown={e=>e.key==='Enter'&&scrapeProductUrl()}/>
@@ -546,7 +572,7 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
 
           <div className="step-nav">
             <button className="btn btn-secondary" onClick={()=>setStep(0)}><ChevronLeft size={14}/> Back</button>
-            <button className="btn btn-primary" style={{padding:'12px 24px'}} onClick={generatePosts} disabled={generatingPosts||(!photo&&!photoUrl&&!productInfo&&!aiImageUrl)}>
+            <button className="btn btn-primary" style={{padding:'12px 24px'}} onClick={generatePosts} disabled={generatingPosts||(productType==='physical'?(!photo&&!photoUrl&&!productInfo&&!aiImageUrl):(!productInfo&&!customScene&&!aiImageUrl))}>
               {generatingPosts?<><span className="spinner"/> Creating posts…</>:<><Sparkles size={16}/> Generate 5 Posts</>}
             </button>
           </div>
