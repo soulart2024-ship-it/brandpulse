@@ -380,7 +380,7 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
     const img = imageUrl ? await loadImage(imageUrl) : null
     const logoImg = (showLogo&&logoUrl) ? await loadImage(logoUrl) : null
     tmpl.draw(ctx,pw,ph,img,posts[idx],brand,accent,logoImg,logoPosition,logoScale,getSizes(idx))
-  }, [posts,fmt,aiImageUrl,photo,brand,accentColors,showLogo,logoUrl,logoPosition,logoScale,loadImage])
+  }, [posts,fmt,aiImageUrl,photo,brand,accentColors,showLogo,logoUrl,logoPosition,logoScale,loadImage,textSizes])
 
   useEffect(() => { if(posts.length) posts.forEach((_,i)=>setTimeout(()=>renderCanvas(i),100+i*80)) }, [posts,renderCanvas])
   useEffect(() => { if(posts.length&&colorAnalysis) posts.forEach((_,i)=>setTimeout(()=>renderCanvas(i),50+i*60)) }, [accentColors])
