@@ -82,8 +82,10 @@ function drawLogo(ctx, w, h, logoImg, position, scale) {
   ctx.drawImage(logoImg, x, y, logoW, logoH)
 }
 
+const DEFAULT_TEXT_SIZES = { headline: 1, subtext: 1 }
+
 // ── TEMPLATE 1: Bright Strip ──────────────────────────────────────────────────
-function drawBrightStrip(ctx, w, h, img, post, brand, accent, logoImg, logoPos, logoScale) {
+function drawBrightStrip(ctx, w, h, img, post, brand, accent, logoImg, logoPos, logoScale, sizes=DEFAULT_TEXT_SIZES) {
   const imgH=Math.floor(h*0.63), stripY=imgH, stripH=h-imgH
   const pad=Math.max(12,w*0.07), tw=w-pad*2
   ctx.fillStyle='#0F0A1E'; ctx.fillRect(0,0,w,h)
@@ -92,14 +94,14 @@ function drawBrightStrip(ctx, w, h, img, post, brand, accent, logoImg, logoPos, 
   ctx.fillStyle=accent;ctx.fillRect(0,stripY,w,stripH)
   ctx.fillStyle='rgba(255,255,255,0.55)';ctx.textAlign='center';ctx.font=`600 ${Math.max(7,stripH*0.13)}px "Space Grotesk",sans-serif`
   ctx.fillText((brand?.industry??'').toUpperCase().slice(0,20),w/2,stripY+stripH*0.2)
-  ctx.fillStyle='#FFF';fitLine(ctx,post.headline??'',w/2,stripY+stripH*0.47,tw,Math.max(12,stripH*0.24),'800')
-  ctx.fillStyle='rgba(255,255,255,0.8)';fitSubtext(ctx,post.subtext??'',w/2,stripY+stripH*0.67,tw,stripH*0.14,Math.max(8,stripH*0.12))
+  ctx.fillStyle='#FFF';fitLine(ctx,post.headline??'',w/2,stripY+stripH*0.47,tw,Math.max(12,stripH*0.24)*(sizes?.headline??1),'800')
+  ctx.fillStyle='rgba(255,255,255,0.8)';fitSubtext(ctx,post.subtext??'',w/2,stripY+stripH*0.67,tw,stripH*0.14*(sizes?.subtext??1),Math.max(8,stripH*0.12)*(sizes?.subtext??1))
   
   drawLogo(ctx,w,h,logoImg,logoPos,logoScale)
 }
 
 // ── TEMPLATE 2: Dark Strip ────────────────────────────────────────────────────
-function drawDarkStrip(ctx, w, h, img, post, brand, accent, logoImg, logoPos, logoScale) {
+function drawDarkStrip(ctx, w, h, img, post, brand, accent, logoImg, logoPos, logoScale, sizes=DEFAULT_TEXT_SIZES) {
   const imgH=Math.floor(h*0.60), stripY=imgH, stripH=h-imgH, kx=18, tw=w-kx-12
   ctx.fillStyle='#0a0518';ctx.fillRect(0,0,w,h)
   if(img){ctx.save();ctx.beginPath();ctx.rect(0,0,w,imgH);ctx.clip();const s=Math.max(w/img.width,imgH/img.height);ctx.drawImage(img,(w-img.width*s)/2,(imgH-img.height*s)/2,img.width*s,img.height*s);ctx.restore()}
@@ -107,8 +109,8 @@ function drawDarkStrip(ctx, w, h, img, post, brand, accent, logoImg, logoPos, lo
   ctx.fillStyle=accent;ctx.fillRect(0,stripY+2,3,stripH-4)
   ctx.fillStyle=accent;ctx.textAlign='left';ctx.font=`700 ${Math.max(7,stripH*0.12)}px "Space Grotesk",sans-serif`
   ctx.fillText((brand?.industry??'').toUpperCase().slice(0,16),kx,stripY+stripH*0.18)
-  ctx.fillStyle='#FFF';fitLine(ctx,post.headline??'',kx,stripY+stripH*0.40,tw,Math.max(12,stripH*0.22),'700','left');ctx.textAlign='left'
-  ctx.fillStyle='rgba(255,255,255,0.72)';fitSubtext(ctx,post.subtext??'',kx,stripY+stripH*0.60,tw,stripH*0.13,Math.max(8,stripH*0.11),'left')
+  ctx.fillStyle='#FFF';fitLine(ctx,post.headline??'',kx,stripY+stripH*0.40,tw,Math.max(12,stripH*0.22)*(sizes?.headline??1),'700','left');ctx.textAlign='left'
+  ctx.fillStyle='rgba(255,255,255,0.72)';fitSubtext(ctx,post.subtext??'',kx,stripY+stripH*0.60,tw,stripH*0.13*(sizes?.subtext??1),Math.max(8,stripH*0.11)*(sizes?.subtext??1),'left')
   // CTA as text only — no pill that overflows
   ctx.fillStyle=accent;ctx.textAlign='left';ctx.font=`700 ${Math.max(8,stripH*0.14)}px "Space Grotesk",sans-serif`
   ctx.fillText('→ '+(post.cta??'Learn More'),kx,stripY+stripH*0.84)
@@ -117,14 +119,14 @@ function drawDarkStrip(ctx, w, h, img, post, brand, accent, logoImg, logoPos, lo
 }
 
 // ── TEMPLATE 3: Duo Strip ─────────────────────────────────────────────────────
-function drawDuoStrip(ctx, w, h, img, post, brand, accent, logoImg, logoPos, logoScale) {
+function drawDuoStrip(ctx, w, h, img, post, brand, accent, logoImg, logoPos, logoScale, sizes=DEFAULT_TEXT_SIZES) {
   const imgH=Math.floor(h*0.65), stripY=imgH, stripH=h-imgH, pad=Math.max(12,w*0.06), tw=w-pad*2
   ctx.fillStyle='#0F0A1E';ctx.fillRect(0,0,w,h)
   if(img){ctx.save();ctx.beginPath();ctx.rect(0,0,w,imgH);ctx.clip();const s=Math.max(w/img.width,imgH/img.height);ctx.drawImage(img,(w-img.width*s)/2,(imgH-img.height*s)/2,img.width*s,img.height*s);ctx.restore()}
   const fade=ctx.createLinearGradient(0,imgH-18,0,imgH+1);fade.addColorStop(0,'rgba(15,10,30,0)');fade.addColorStop(1,'#1a0f3a');ctx.fillStyle=fade;ctx.fillRect(0,imgH-18,w,20)
   ctx.fillStyle='#1a0f3a';ctx.fillRect(0,stripY,w,stripH);ctx.fillStyle=accent;ctx.fillRect(0,stripY,w,3)
-  ctx.fillStyle='#FFF';fitLine(ctx,post.headline??'',w/2,stripY+stripH*0.36,tw,Math.max(12,stripH*0.26),'800')
-  ctx.fillStyle='rgba(255,255,255,0.7)';fitSubtext(ctx,post.subtext??'',w/2,stripY+stripH*0.57,tw,stripH*0.14,Math.max(8,stripH*0.12))
+  ctx.fillStyle='#FFF';fitLine(ctx,post.headline??'',w/2,stripY+stripH*0.36,tw,Math.max(12,stripH*0.26)*(sizes?.headline??1),'800')
+  ctx.fillStyle='rgba(255,255,255,0.7)';fitSubtext(ctx,post.subtext??'',w/2,stripY+stripH*0.57,tw,stripH*0.14*(sizes?.subtext??1),Math.max(8,stripH*0.12)*(sizes?.subtext??1))
   ctx.fillStyle=accent;ctx.textAlign='center';ctx.font=`700 ${Math.max(7,stripH*0.13)}px "Space Grotesk",sans-serif`;ctx.fillText((post.cta??'Learn More').toUpperCase(),w/2,stripY+stripH*0.83)
   
   drawLogo(ctx,w,h,logoImg,logoPos,logoScale)
@@ -132,7 +134,7 @@ function drawDuoStrip(ctx, w, h, img, post, brand, accent, logoImg, logoPos, log
 
 // ── TEMPLATE 4: Bold Overlay ──────────────────────────────────────────────────
 // Full image, bold headline centered middle, thin accent bar, minimal text
-function drawBoldOverlay(ctx, w, h, img, post, brand, accent, logoImg, logoPos, logoScale) {
+function drawBoldOverlay(ctx, w, h, img, post, brand, accent, logoImg, logoPos, logoScale, sizes=DEFAULT_TEXT_SIZES) {
   ctx.fillStyle='#111';ctx.fillRect(0,0,w,h)
   if(img){const s=Math.max(w/img.width,h/img.height);ctx.drawImage(img,(w-img.width*s)/2,(h-img.height*s)/2,img.width*s,img.height*s)}
   // Dark scrim bottom half
@@ -142,9 +144,9 @@ function drawBoldOverlay(ctx, w, h, img, post, brand, accent, logoImg, logoPos, 
   // Headline above bar
   ctx.fillStyle='#FFF';ctx.textAlign='center'
   const pad=w*0.07, tw=w-pad*2
-  fitLine(ctx,post.headline??'',w/2,h*0.48,tw,Math.max(14,h*0.072),'800')
+  fitLine(ctx,post.headline??'',w/2,h*0.48,tw,Math.max(14,h*0.072)*(sizes?.headline??1),'800')
   // Subtext below bar
-  ctx.fillStyle='rgba(255,255,255,0.75)';fitSubtext(ctx,post.subtext??'',w/2,h*0.59,tw,h*0.046,Math.max(9,h*0.038))
+  ctx.fillStyle='rgba(255,255,255,0.75)';fitSubtext(ctx,post.subtext??'',w/2,h*0.59,tw,h*0.046*(sizes?.subtext??1),Math.max(9,h*0.038)*(sizes?.subtext??1))
   // CTA
   ctx.fillStyle=accent;ctx.font=`700 ${Math.max(8,h*0.038)}px "Space Grotesk",sans-serif`;ctx.textAlign='center'
   ctx.fillText((post.cta??'Learn More').toUpperCase(),w/2,h*0.72)
@@ -155,7 +157,7 @@ function drawBoldOverlay(ctx, w, h, img, post, brand, accent, logoImg, logoPos, 
 
 // ── TEMPLATE 5: Gradient Frame ────────────────────────────────────────────────
 // Gradient background, product centered top, clean text bottom
-function drawGradientFrame(ctx, w, h, img, post, brand, accent, logoImg, logoPos, logoScale) {
+function drawGradientFrame(ctx, w, h, img, post, brand, accent, logoImg, logoPos, logoScale, sizes=DEFAULT_TEXT_SIZES) {
   // Gradient background
   const bg=ctx.createLinearGradient(0,0,w,h)
   bg.addColorStop(0,'#0F0A1E');bg.addColorStop(0.5,accent+'44');bg.addColorStop(1,'#0F0A1E')
@@ -166,8 +168,8 @@ function drawGradientFrame(ctx, w, h, img, post, brand, accent, logoImg, logoPos
   ctx.fillStyle='rgba(255,255,255,0.08)';ctx.fillRect(0,stripY,w,stripH)
   ctx.fillStyle=accent;ctx.fillRect(0,stripY,w,2)
   const pad=Math.max(12,w*0.07), tw=w-pad*2
-  ctx.fillStyle='#FFF';fitLine(ctx,post.headline??'',w/2,stripY+stripH*0.38,tw,Math.max(12,stripH*0.26),'800')
-  ctx.fillStyle='rgba(255,255,255,0.72)';fitSubtext(ctx,post.subtext??'',w/2,stripY+stripH*0.60,tw,stripH*0.14,Math.max(8,stripH*0.12))
+  ctx.fillStyle='#FFF';fitLine(ctx,post.headline??'',w/2,stripY+stripH*0.38,tw,Math.max(12,stripH*0.26)*(sizes?.headline??1),'800')
+  ctx.fillStyle='rgba(255,255,255,0.72)';fitSubtext(ctx,post.subtext??'',w/2,stripY+stripH*0.60,tw,stripH*0.14*(sizes?.subtext??1),Math.max(8,stripH*0.12)*(sizes?.subtext??1))
   // CTA pill
   const ctaW=Math.min(tw*0.55,120),ctaH=Math.max(18,stripH*0.18),ctaX=(w-ctaW)/2,ctaY=stripY+stripH*0.78
   ctx.fillStyle=accent;ctx.beginPath();ctx.roundRect(ctaX,ctaY,ctaW,ctaH,ctaH/2);ctx.fill()
@@ -212,6 +214,9 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
   const [editVal, setEditVal] = useState('')
   const [accentColors, setAccentColors] = useState(TEMPLATES.map(t=>t.accent))
   const [colorSource, setColorSource] = useState('ai') // 'ai' | 'brand'
+  const [textSizes, setTextSizes] = useState({})
+  const getSizes = (idx) => textSizes[idx] || DEFAULT_TEXT_SIZES
+  const setSize = (idx, field, val) => setTextSizes(prev => ({ ...prev, [idx]: { ...(prev[idx]||DEFAULT_TEXT_SIZES), [field]: val } }))
 
   // Logo — auto-populate from Brand Brain logo
   const [logoOverrideUrl, setLogoOverrideUrl] = useState(null)
@@ -374,7 +379,7 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
     const imageUrl = aiImageUrl||photo?.url||null
     const img = imageUrl ? await loadImage(imageUrl) : null
     const logoImg = (showLogo&&logoUrl) ? await loadImage(logoUrl) : null
-    tmpl.draw(ctx,pw,ph,img,posts[idx],brand,accent,logoImg,logoPosition,logoScale)
+    tmpl.draw(ctx,pw,ph,img,posts[idx],brand,accent,logoImg,logoPosition,logoScale,getSizes(idx))
   }, [posts,fmt,aiImageUrl,photo,brand,accentColors,showLogo,logoUrl,logoPosition,logoScale,loadImage])
 
   useEffect(() => { if(posts.length) posts.forEach((_,i)=>setTimeout(()=>renderCanvas(i),100+i*80)) }, [posts,renderCanvas])
@@ -393,6 +398,7 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
   }, [colorSource, brand?.colors, colorAnalysis])
 
   useEffect(() => { if(posts.length) posts.forEach((_,i)=>setTimeout(()=>renderCanvas(i),50+i*50)) }, [showLogo,logoUrl,logoPosition,logoScale])
+  useEffect(() => { if(posts.length) posts.forEach((_,i)=>setTimeout(()=>renderCanvas(i),40+i*40)) }, [textSizes])
 
   const startEdit = (idx,field,current) => { setEditing({idx,field}); setEditVal(current??'') }
   const saveEdit = () => {
@@ -406,7 +412,7 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
     const ctx=off.getContext('2d'); ctx.scale(2,2)
     const imageUrl=aiImageUrl||photo?.url||null; const img=imageUrl?await loadImage(imageUrl):null
     const logoImg=(showLogo&&logoUrl)?await loadImage(logoUrl):null
-    TEMPLATES[idx%TEMPLATES.length].draw(ctx,fmt.pw,fmt.ph,img,posts[idx],brand,accentColors[idx%TEMPLATES.length],logoImg,logoPosition,logoScale)
+    TEMPLATES[idx%TEMPLATES.length].draw(ctx,fmt.pw,fmt.ph,img,posts[idx],brand,accentColors[idx%TEMPLATES.length],logoImg,logoPosition,logoScale,getSizes(idx))
     const a=document.createElement('a'); a.download=`brandpulse-${TEMPLATES[idx%TEMPLATES.length].id}-${Date.now()}.png`; a.href=off.toDataURL('image/png'); a.click()
   }
 
@@ -645,6 +651,20 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
                       )}
                     </div>
                   ))}
+                </div>
+                <div className="text-size-controls" onClick={e=>e.stopPropagation()}>
+                  <div className="size-slider-row">
+                    <span className="size-slider-label">Headline size</span>
+                    <input type="range" min="0.6" max="1.6" step="0.05"
+                      value={getSizes(i).headline}
+                      onChange={e=>setSize(i,'headline',parseFloat(e.target.value))}/>
+                  </div>
+                  <div className="size-slider-row">
+                    <span className="size-slider-label">Subtext size</span>
+                    <input type="range" min="0.6" max="1.6" step="0.05"
+                      value={getSizes(i).subtext}
+                      onChange={e=>setSize(i,'subtext',parseFloat(e.target.value))}/>
+                  </div>
                 </div>
                 <div className="post-copy">
                   <p className="post-caption-preview">{post.caption}</p>

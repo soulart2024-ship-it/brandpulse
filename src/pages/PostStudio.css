@@ -73,3 +73,8 @@
 .color-reasoning{font-size:10px;color:var(--text-lo);font-style:italic;width:100%;padding-top:2px}
 
 @media(max-width:768px){.posts-grid{grid-template-columns:1fr}}
+
+.text-size-controls{display:flex;flex-direction:column;gap:6px;padding:8px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.size-slider-row{display:flex;align-items:center;gap:8px}
+.size-slider-label{font-size:10px;color:var(--text-lo);width:80px;flex-shrink:0}
+.size-slider-row input[type="range"]{flex:1;accent-color:var(--violet)}
