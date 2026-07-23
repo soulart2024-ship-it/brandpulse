@@ -82,7 +82,14 @@ function drawLogo(ctx, w, h, logoImg, position, scale) {
   ctx.drawImage(logoImg, x, y, logoW, logoH)
 }
 
-function renderBottomStrip(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale,sizes,cfg){
+function withAlpha(hex, alpha) {
+  const h = (hex||'#FFFFFF').replace('#','')
+  const full = h.length===3 ? h.split('').map(c=>c+c).join('') : h
+  const r = parseInt(full.substring(0,2),16), g = parseInt(full.substring(2,4),16), b = parseInt(full.substring(4,6),16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
+function renderBottomStrip(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale,sizes,cfg,textColor='#FFFFFF'){
   const ratio=cfg.splitRatio??0.62
   const imgH=Math.floor(h*ratio), stripY=imgH, stripH=h-imgH
   const alignL = cfg.align==='left'
@@ -117,7 +124,7 @@ function renderBottomStrip(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoSca
     g.addColorStop(0,'rgba(10,5,24,0)'); g.addColorStop(0.2,'rgba(10,5,24,0.96)'); g.addColorStop(1,'#0a0518')
     ctx.fillStyle=g; ctx.fillRect(0,stripY-10,w,stripH+10)
   } else if(cfg.bg==='glass'){
-    ctx.fillStyle='rgba(255,255,255,0.08)'; ctx.fillRect(0,stripY,w,stripH)
+    ctx.fillStyle=withAlpha(textColor,0.08); ctx.fillRect(0,stripY,w,stripH)
   }
 
   if(cfg.accentShape==='bar'){ ctx.fillStyle=accent; ctx.fillRect(0,stripY+2,3,stripH-4) }
@@ -126,7 +133,7 @@ function renderBottomStrip(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoSca
 
   let cy
   if(cfg.kicker){
-    ctx.fillStyle= (cfg.bg==='solid')?'rgba(255,255,255,0.55)':accent
+    ctx.fillStyle= (cfg.bg==='solid')?withAlpha(textColor,0.55):accent
     ctx.textAlign=alignL?'left':'center'
     ctx.font=`700 ${Math.max(7,stripH*0.12)}px "Space Grotesk",sans-serif`
     ctx.fillText((brand?.industry??'').toUpperCase().slice(0,18), tx, stripY+stripH*0.18)
@@ -135,17 +142,17 @@ function renderBottomStrip(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoSca
     cy = stripY+stripH*0.40
   }
 
-  ctx.fillStyle='#FFF'
+  ctx.fillStyle=textColor
   fitLine(ctx,post.headline??'',tx,cy,tw,Math.max(12,stripH*0.24)*(sizes?.headline??1),'800',alignL?'left':'center')
-  ctx.fillStyle='rgba(255,255,255,0.78)'
+  ctx.fillStyle=withAlpha(textColor,0.78)
   fitSubtext(ctx,post.subtext??'',tx,cy+stripH*0.20,tw,stripH*0.14*(sizes?.subtext??1),Math.max(8,stripH*0.12)*(sizes?.subtext??1),alignL?'left':'center')
 
   if(cfg.cta==='pill'){
     const ctaW=Math.min(tw*0.6,140), ctaH=Math.max(18,stripH*0.16)
     const ctaX= alignL?pad:(w-ctaW)/2, ctaY=h-ctaH-10
-    ctx.fillStyle= cfg.bg==='solid'?'rgba(255,255,255,0.2)':accent
+    ctx.fillStyle= cfg.bg==='solid'?withAlpha(textColor,0.2):accent
     ctx.beginPath();ctx.roundRect(ctaX,ctaY,ctaW,ctaH,ctaH/2);ctx.fill()
-    ctx.fillStyle='#FFF'
+    ctx.fillStyle=textColor
     fitLine(ctx,post.cta??'Learn More',ctaX+ctaW/2,ctaY+ctaH*0.66,ctaW-12,Math.max(7,ctaH*0.46)*(sizes?.cta??1),'700')
   } else if(cfg.cta==='text'){
     ctx.fillStyle=accent; ctx.textAlign=alignL?'left':'center'
@@ -157,7 +164,7 @@ function renderBottomStrip(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoSca
   drawLogo(ctx,w,h,logoImg,logoPos,logoScale)
 }
 
-function renderSidePanel(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale,sizes,cfg){
+function renderSidePanel(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale,sizes,cfg,textColor='#FFFFFF'){
   const panelRatio=cfg.panelRatio??0.46
   const side=cfg.side??'right'
   const imgW = w*(1-panelRatio)
@@ -183,23 +190,23 @@ function renderSidePanel(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale
   }
   const tx = panelX + panelW*0.12
   const tw = panelW*0.76
-  ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.textAlign='left'
+  ctx.fillStyle=withAlpha(textColor,0.55); ctx.textAlign='left'
   ctx.font=`600 ${Math.max(7,h*0.031)}px "Space Grotesk",sans-serif`
   ctx.fillText((brand?.industry??'').toUpperCase().slice(0,12), tx, h*0.16)
-  ctx.fillStyle='#FFF'
+  ctx.fillStyle=textColor
   fitLine(ctx,post.headline??'',tx,h*0.30,tw,Math.max(11,h*0.066)*(sizes?.headline??1),'800','left')
-  ctx.fillStyle='rgba(255,255,255,0.78)'
+  ctx.fillStyle=withAlpha(textColor,0.78)
   fitSubtext(ctx,post.subtext??'',tx,h*0.42,tw,h*0.048*(sizes?.subtext??1),Math.max(8,h*0.036)*(sizes?.subtext??1),'left')
   if(cfg.cta!=='none'){
     const ctaY=h*0.72, ctaH=h*0.09, ctaW=Math.min(tw,130)
-    ctx.fillStyle='rgba(255,255,255,0.2)'; ctx.beginPath(); ctx.roundRect(tx,ctaY,ctaW,ctaH,4); ctx.fill()
-    ctx.fillStyle='#FFF'
+    ctx.fillStyle=withAlpha(textColor,0.2); ctx.beginPath(); ctx.roundRect(tx,ctaY,ctaW,ctaH,4); ctx.fill()
+    ctx.fillStyle=textColor
     fitLine(ctx,post.cta??'Learn More',tx+ctaW/2,ctaY+ctaH*0.65,ctaW-10,Math.max(7,h*0.033)*(sizes?.cta??1),'700')
   }
   drawLogo(ctx,w,h,logoImg,logoPos,logoScale)
 }
 
-function renderFullOverlay(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale,sizes,cfg){
+function renderFullOverlay(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale,sizes,cfg,textColor='#FFFFFF'){
   ctx.fillStyle='#111'; ctx.fillRect(0,0,w,h)
   if(img){ const s=Math.max(w/img.width,h/img.height); ctx.drawImage(img,(w-img.width*s)/2,(h-img.height*s)/2,img.width*s,img.height*s) }
 
@@ -224,9 +231,9 @@ function renderFullOverlay(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoSca
   const sY = cfg.textPos==='center'?h*0.535:h*0.585
   const cY = cfg.textPos==='center'?h*0.635:h*0.70
 
-  ctx.fillStyle='#FFF'
+  ctx.fillStyle=textColor
   fitLine(ctx,post.headline??'',tx,hY,tw,Math.max(13,h*0.07)*(sizes?.headline??1),'800',alignL?'left':'center')
-  ctx.fillStyle='rgba(255,255,255,0.78)'
+  ctx.fillStyle=withAlpha(textColor,0.78)
   fitSubtext(ctx,post.subtext??'',tx,sY,tw,h*0.045*(sizes?.subtext??1),Math.max(9,h*0.038)*(sizes?.subtext??1),alignL?'left':'center')
 
   if(cfg.cta!=='none'){
@@ -235,14 +242,14 @@ function renderFullOverlay(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoSca
     ctx.fillText((post.cta??'Learn More').toUpperCase(), tx, cY)
   }
 
-  ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.textAlign='left'
+  ctx.fillStyle=withAlpha(textColor,0.85); ctx.textAlign='left'
   ctx.font=`600 ${Math.max(7,h*0.03)}px "Space Grotesk",sans-serif`
   ctx.fillText((brand?.industry??'').toUpperCase().slice(0,16), 12, 20)
 
   drawLogo(ctx,w,h,logoImg,logoPos,logoScale)
 }
 
-function renderFramedBorder(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale,sizes,cfg){
+function renderFramedBorder(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale,sizes,cfg,textColor='#FFFFFF'){
   ctx.fillStyle=accent; ctx.fillRect(0,0,w,h)
   const bw = cfg.borderWidth??10
   const innerX=bw, innerY=bw, innerW=w-bw*2, innerH=h-bw*2
@@ -261,14 +268,14 @@ function renderFramedBorder(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoSc
   ctx.fillStyle=accent; ctx.textAlign='center'
   ctx.font=`600 ${Math.max(7,stripH*0.12)}px "Space Grotesk",sans-serif`
   ctx.fillText((brand?.industry??'').toUpperCase().slice(0,18), innerX+innerW/2, stripY+stripH*0.22)
-  ctx.fillStyle='#FFF'
+  ctx.fillStyle=textColor
   fitLine(ctx,post.headline??'',innerX+innerW/2,stripY+stripH*0.48,tw,Math.max(11,stripH*0.22)*(sizes?.headline??1),'800')
-  ctx.fillStyle='rgba(255,255,255,0.72)'
+  ctx.fillStyle=withAlpha(textColor,0.72)
   fitSubtext(ctx,post.subtext??'',innerX+innerW/2,stripY+stripH*0.68,tw,stripH*0.13*(sizes?.subtext??1),Math.max(8,stripH*0.11)*(sizes?.subtext??1))
   drawLogo(ctx,w,h,logoImg,logoPos,logoScale)
 }
 
-function renderPhoneMockup(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale,sizes,cfg){
+function renderPhoneMockup(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale,sizes,cfg,textColor='#FFFFFF'){
   const bg=ctx.createLinearGradient(0,0,w,h)
   bg.addColorStop(0,'#0F0A1E'); bg.addColorStop(1,accent+'33')
   ctx.fillStyle=bg; ctx.fillRect(0,0,w,h)
@@ -308,9 +315,9 @@ function renderPhoneMockup(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoSca
   const textY = phoneY+phoneH+h*0.03
   const textH = h - textY - h*0.02
   const tw = w*0.82
-  ctx.fillStyle='#FFF'; ctx.textAlign='center'
+  ctx.fillStyle=textColor; ctx.textAlign='center'
   fitLine(ctx,post.headline??'',w/2,textY+textH*0.32,tw,Math.max(11,textH*0.32)*(sizes?.headline??1),'800')
-  ctx.fillStyle='rgba(255,255,255,0.75)'
+  ctx.fillStyle=withAlpha(textColor,0.75)
   fitSubtext(ctx,post.subtext??'',w/2,textY+textH*0.58,tw,textH*0.2*(sizes?.subtext??1),Math.max(8,textH*0.17)*(sizes?.subtext??1))
   if(cfg.cta!=='none'){
     ctx.fillStyle=accent; ctx.font=`700 ${Math.max(8,textH*0.19)*(sizes?.cta??1)}px "Space Grotesk",sans-serif`
@@ -322,7 +329,7 @@ function renderPhoneMockup(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoSca
 const RENDERERS = { bottomStrip: renderBottomStrip, sidePanel: renderSidePanel, fullOverlay: renderFullOverlay, framedBorder: renderFramedBorder, phoneMockup: renderPhoneMockup }
 
 function makeDraw(layout, style) {
-  return (ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale,sizes) => RENDERERS[layout](ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale,sizes,style)
+  return (ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale,sizes,textColor) => RENDERERS[layout](ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale,sizes,style,textColor)
 }
 
 const TEMPLATES_RAW = [
@@ -424,6 +431,7 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
   const [editing, setEditing] = useState(null)
   const [editVal, setEditVal] = useState('')
   const [accentColors, setAccentColors] = useState(TEMPLATES.map(t=>t.accent))
+  const [textColor, setTextColor] = useState('#FFFFFF')
   const [colorSource, setColorSource] = useState('ai')
   const [textSizes, setTextSizes] = useState({})
   const getSizes = (idx) => textSizes[idx] || DEFAULT_TEXT_SIZES
@@ -592,13 +600,14 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
     const imageUrl = aiImageUrl||photo?.url||null
     const img = imageUrl ? await loadImage(imageUrl) : null
     const logoImg = (showLogo&&logoUrl) ? await loadImage(logoUrl) : null
-    selectedTemplate.draw(ctx,pw,ph,img,posts[idx],brand,accent,logoImg,logoPosition,logoScale,getSizes(idx))
-  }, [posts,fmt,aiImageUrl,photo,brand,accentColors,showLogo,logoUrl,logoPosition,logoScale,loadImage,textSizes,selectedTemplate])
+    selectedTemplate.draw(ctx,pw,ph,img,posts[idx],brand,accent,logoImg,logoPosition,logoScale,getSizes(idx),textColor)
+  }, [posts,fmt,aiImageUrl,photo,brand,accentColors,showLogo,logoUrl,logoPosition,logoScale,loadImage,textSizes,selectedTemplate,textColor])
 
   useEffect(() => { if(posts.length) posts.forEach((_,i)=>setTimeout(()=>renderCanvas(i),100+i*80)) }, [posts,renderCanvas])
   useEffect(() => { if(posts.length&&colorAnalysis) posts.forEach((_,i)=>setTimeout(()=>renderCanvas(i),50+i*60)) }, [accentColors])
   useEffect(() => { if(posts.length) posts.forEach((_,i)=>setTimeout(()=>renderCanvas(i),50+i*50)) }, [showLogo,logoUrl,logoPosition,logoScale])
   useEffect(() => { if(posts.length) posts.forEach((_,i)=>setTimeout(()=>renderCanvas(i),40+i*40)) }, [textSizes])
+  useEffect(() => { if(posts.length) posts.forEach((_,i)=>setTimeout(()=>renderCanvas(i),35+i*35)) }, [textColor])
   useEffect(() => {
     if (colorSource === 'brand' && brand?.colors?.length > 0) {
       const bc = brand.colors
@@ -621,7 +630,7 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
     const ctx=off.getContext('2d'); ctx.scale(2,2)
     const imageUrl=aiImageUrl||photo?.url||null; const img=imageUrl?await loadImage(imageUrl):null
     const logoImg=(showLogo&&logoUrl)?await loadImage(logoUrl):null
-    selectedTemplate.draw(ctx,fmt.pw,fmt.ph,img,posts[idx],brand,accentColors[0],logoImg,logoPosition,logoScale,getSizes(idx))
+    selectedTemplate.draw(ctx,fmt.pw,fmt.ph,img,posts[idx],brand,accentColors[0],logoImg,logoPosition,logoScale,getSizes(idx),textColor)
     const a=document.createElement('a'); a.download=`brandpulse-${selectedTemplate.id}-${Date.now()}.png`; a.href=off.toDataURL('image/png'); a.click()
   }
 
@@ -871,6 +880,12 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
             </div>
             <input type="color" value={accentColors[0]} onChange={e=>{const nc=[...accentColors];nc[0]=e.target.value;setAccentColors(nc)}}
               style={{width:28,height:28,border:'none',borderRadius:6,cursor:'pointer',padding:0,marginLeft:'auto'}}/>
+            <span style={{fontSize:12,color:'var(--text-mid)',fontFamily:'Space Grotesk',fontWeight:600}}>Text:</span>
+            <input type="color" value={textColor} onChange={e=>setTextColor(e.target.value)}
+              style={{width:28,height:28,border:'none',borderRadius:6,cursor:'pointer',padding:0}}/>
+            <button className="btn-ghost" style={{fontSize:11}} onClick={()=>setTextColor(textColor==='#FFFFFF'?'#111111':'#FFFFFF')}>
+              {textColor==='#FFFFFF'?'Switch to dark text':'Switch to light text'}
+            </button>
           </div>
 
           <div className="card logo-panel">
