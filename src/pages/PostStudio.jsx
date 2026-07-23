@@ -428,6 +428,13 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
   const [generatingPosts, setGeneratingPosts] = useState(false)
   const [posts, setPosts] = useState([])
   const [chosen, setChosen] = useState(null)
+  const [bufferChannels, setBufferChannels] = useState([])
+  const [loadingChannels, setLoadingChannels] = useState(false)
+  const [bufferChannelId, setBufferChannelId] = useState('')
+  const [schedulingIdx, setSchedulingIdx] = useState(null)
+  const [scheduleError, setScheduleError] = useState('')
+  const [scheduleSuccess, setScheduleSuccess] = useState(null)
+  const [scheduleDate, setScheduleDate] = useState('')
   const [editing, setEditing] = useState(null)
   const [editVal, setEditVal] = useState('')
   const [accentColors, setAccentColors] = useState(TEMPLATES.map(t=>t.accent))
@@ -589,6 +596,44 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
       setPosts(parsed.posts.slice(0,3)); setStep(3)
     } catch(e) { console.error(e) }
     setGeneratingPosts(false)
+  }
+
+  const fetchBufferChannels = async () => {
+    setLoadingChannels(true); setScheduleError('')
+    try {
+      const res = await fetch('/api/buffer')
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setBufferChannels(data.channels || [])
+      if (data.channels?.[0]) setBufferChannelId(data.channels[0].id)
+    } catch(e) { setScheduleError(e.message || 'Could not load Buffer channels — check BUFFER_API_KEY in Vercel.') }
+    setLoadingChannels(false)
+  }
+
+  const sendToBuffer = async (idx) => {
+    if (!bufferChannelId) { setScheduleError('Pick a channel first.'); return }
+    setSchedulingIdx(idx); setScheduleError(''); setScheduleSuccess(null)
+    try {
+      const canvas = canvasRefs.current[idx]
+      const imageDataUrl = canvas ? canvas.toDataURL('image/png') : null
+      const post = posts[idx]
+      const text = `${post.caption}\n\n${(post.hashtags||[]).map(h=>h.startsWith('#')?h:'#'+h).join(' ')}`
+      const body = {
+        text,
+        channelId: bufferChannelId,
+        imageUrl: imageDataUrl,
+        mode: scheduleDate ? 'customScheduled' : 'addToQueue',
+        ...(scheduleDate && { dueAt: new Date(scheduleDate).toISOString() })
+      }
+      const res = await fetch('/api/buffer', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) throw new Error(data.error || 'Failed to schedule post')
+      setScheduleSuccess(idx)
+      setTimeout(() => setScheduleSuccess(null), 4000)
+    } catch(e) { setScheduleError(e.message || 'Failed to send to Buffer.') }
+    setSchedulingIdx(null)
   }
 
   const renderCanvas = useCallback(async (idx) => {
@@ -923,6 +968,36 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
             )}
           </div>
 
+          <div className="card logo-panel">
+            <div className="logo-panel-header">
+              <div style={{display:'flex',alignItems:'center',gap:8}}><Send size={15} style={{color:'var(--electric)'}}/><strong style={{fontSize:13,fontFamily:'Space Grotesk'}}>Buffer Scheduling</strong></div>
+              {bufferChannels.length===0 && (
+                <button className="btn btn-secondary" style={{fontSize:12,padding:'6px 12px'}} onClick={fetchBufferChannels} disabled={loadingChannels}>
+                  {loadingChannels?<span className="spinner"/>:'Connect Channels'}
+                </button>
+              )}
+            </div>
+            {bufferChannels.length>0 && (
+              <div className="logo-controls animate-slide-up">
+                <div className="field">
+                  <label>Post to channel</label>
+                  <div className="chip-grid">
+                    {bufferChannels.map(ch=>(
+                      <button key={ch.id} className={`chip ${bufferChannelId===ch.id?'chip-active':''}`} onClick={()=>setBufferChannelId(ch.id)}>
+                        {ch.name} <span style={{opacity:0.6,fontSize:10}}>({ch.service})</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="field">
+                  <label>Schedule for (leave blank to add to next queue slot)</label>
+                  <input type="datetime-local" value={scheduleDate} onChange={e=>setScheduleDate(e.target.value)}/>
+                </div>
+              </div>
+            )}
+            {scheduleError && <p className="scan-error">{scheduleError}</p>}
+          </div>
+
           <div className="posts-grid">
             {posts.map((post,i)=>(
               <div key={i} className={`post-result-card card ${chosen===i?'post-chosen':''}`} onClick={()=>setChosen(i)}>
@@ -959,7 +1034,9 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
                 </div>
                 <div className="post-actions">
                   <button className="btn btn-secondary" onClick={e=>{e.stopPropagation();download(i)}}><Download size={14}/> Download</button>
-                  <button className="btn btn-primary" onClick={e=>{e.stopPropagation();window.open('https://buffer.com','_blank')}}><Send size={14}/> Buffer</button>
+                  <button className="btn btn-primary" onClick={e=>{e.stopPropagation();sendToBuffer(i)}} disabled={schedulingIdx===i||!bufferChannelId}>
+                    {schedulingIdx===i?<span className="spinner"/>:scheduleSuccess===i?<><Check size={14}/> Sent!</>:<><Send size={14}/> {bufferChannelId?'Schedule':'Connect first'}</>}
+                  </button>
                 </div>
               </div>
             ))}
