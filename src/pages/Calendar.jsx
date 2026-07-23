@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Calendar as CalIcon, Plus, X, Sparkles, RefreshCw, Send } from 'lucide-react'
-import { callClaude } from '../lib/api.js'
+import { callClaude, extractJSON } from '../lib/api.js'
 import './Page.css'
 
 const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
@@ -14,6 +14,7 @@ export default function Calendar({ brand }) {
   const [adding, setAdding] = useState(null)
   const [draft, setDraft] = useState({platform:'Instagram',text:'',color:0})
   const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState('')
 
   const [bufferPosts, setBufferPosts] = useState({})
   const [channels, setChannels] = useState([])
@@ -31,20 +32,23 @@ export default function Calendar({ brand }) {
   const remove = (day,id) => setPosts(p=>({...p,[day]:p[day].filter(x=>x.id!==id)}))
 
   const aiSchedule = async () => {
-    setAiLoading(true)
+    setAiLoading(true); setAiError('')
     try {
       const result = await callClaude({
-        system:'Return JSON only: {"schedule":[{"day":0,"platform":"...","text":"..."}]} — 5 posts Mon-Sun.',
-        messages:[{role:'user',content:`Weekly schedule for ${brand?.name??'a brand'}. Industry: ${brand?.industry??'wellness'}. Tone: ${brand?.tone??'inspiring'}.`}],
+        system:'Return JSON only, no markdown: {"schedule":[{"day":0,"platform":"Instagram","text":"post copy here"}]} — exactly 5 posts spread across Mon-Sun (day 0=Mon .. 6=Sun).',
+        messages:[{role:'user',content:`Weekly content schedule for ${brand?.name??'a brand'}. Industry: ${brand?.industry??'wellness'}. Tone: ${brand?.tone??'inspiring'}.`}],
         max_tokens:800
       })
-      const parsed = JSON.parse(result.replace(/```json|```/g,'').trim())
+      const parsed = extractJSON(result)
+      if (!parsed.schedule?.length) throw new Error('No schedule returned')
       const newPosts = {}
       parsed.schedule.forEach((s,i)=>{
         newPosts[s.day??i]=[...(newPosts[s.day??i]??[]),{...s,id:Date.now()+i,color:i%4}]
       })
       setPosts(p=>{const m={...p};Object.keys(newPosts).forEach(k=>{m[k]=[...(m[k]??[]),...newPosts[k]]});return m})
-    } catch{}
+    } catch(e) {
+      setAiError(e.message || 'Could not generate schedule — please try again.')
+    }
     setAiLoading(false)
   }
 
@@ -100,6 +104,7 @@ export default function Calendar({ brand }) {
         {bufferLoaded && <span style={{fontSize:11,color:'var(--success)'}}>✓ {Object.values(bufferPosts).flat().length} scheduled posts loaded</span>}
       </div>
       {bufferError && <p className="scan-error" style={{marginTop:-8}}>{bufferError}</p>}
+      {aiError && <p className="scan-error" style={{marginTop:-8}}>{aiError}</p>}
 
       <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:10}}>
         {DAYS.map((day,i)=>(

@@ -27,7 +27,7 @@ export default async function handler(req, res) {
     try {
       const channelsData = await callBuffer(`
         query GetChannels {
-          organizations {
+          organizations(input: {}) {
             id
             channels { id name service avatar }
           }
