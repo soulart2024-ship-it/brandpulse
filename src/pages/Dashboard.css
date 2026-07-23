@@ -1,4 +1,4 @@
-.dashboard { display: flex; flex-direction: column; gap: 36px; padding: 40px 44px 44px 44px; max-width: 1180px; }
+.dashboard { display: flex; flex-direction: column; gap: 36px; max-width: 1180px; }
 
 /* Header */
 .dash-header {
