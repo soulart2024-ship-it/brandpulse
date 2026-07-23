@@ -949,9 +949,9 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
                   ))}
                 </div>
                 <div className="text-size-controls" onClick={e=>e.stopPropagation()}>
-                  <div className="size-slider-row"><span className="size-slider-label">Headline size</span><input type="range" min="0.6" max="1.6" step="0.05" value={getSizes(i).headline} onChange={e=>setSize(i,'headline',parseFloat(e.target.value))}/></div>
-                  <div className="size-slider-row"><span className="size-slider-label">Subtext size</span><input type="range" min="0.6" max="1.6" step="0.05" value={getSizes(i).subtext} onChange={e=>setSize(i,'subtext',parseFloat(e.target.value))}/></div>
-                  <div className="size-slider-row"><span className="size-slider-label">CTA size</span><input type="range" min="0.6" max="1.6" step="0.05" value={getSizes(i).cta} onChange={e=>setSize(i,'cta',parseFloat(e.target.value))}/></div>
+                  <div className="size-slider-row"><span className="size-slider-label">Headline size</span><input type="range" min="0.6" max="1.6" step="0.05" value={getSizes(i).headline} onChange={e=>{setSize(i,'headline',parseFloat(e.target.value)); requestAnimationFrame(()=>renderCanvas(i))}}/></div>
+                  <div className="size-slider-row"><span className="size-slider-label">Subtext size</span><input type="range" min="0.6" max="1.6" step="0.05" value={getSizes(i).subtext} onChange={e=>{setSize(i,'subtext',parseFloat(e.target.value)); requestAnimationFrame(()=>renderCanvas(i))}}/></div>
+                  <div className="size-slider-row"><span className="size-slider-label">CTA size</span><input type="range" min="0.6" max="1.6" step="0.05" value={getSizes(i).cta} onChange={e=>{setSize(i,'cta',parseFloat(e.target.value)); requestAnimationFrame(()=>renderCanvas(i))}}/></div>
                 </div>
                 <div className="post-copy">
                   <p className="post-caption-preview">{post.caption}</p>
