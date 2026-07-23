@@ -30,3 +30,11 @@
 /* Collapsible header */
 .collapsible-header{display:flex;align-items:center;justify-content:space-between;width:100%;background:none;border:none;cursor:pointer;padding:4px 0;font-size:14px;font-weight:600;color:var(--text-hi);font-family:'Space Grotesk',sans-serif}
 .collapsible-header span{display:flex;align-items:center;gap:8px}
+
+.tmpl-thumb-side{display:flex;height:120px}
+.tmpl-thumb-panel{}
+.tmpl-thumb-framed{padding:6px;height:120px;box-sizing:border-box}
+.tmpl-thumb-framed-inner{display:flex;flex-direction:column;height:100%;border-radius:4px;overflow:hidden}
+.tmpl-thumb-phone-wrap{height:120px;display:flex;align-items:center;justify-content:center}
+.tmpl-thumb-phone{width:38px;height:76px;background:#111;border-radius:10px;position:relative;border:2px solid rgba(255,255,255,0.15)}
+.tmpl-thumb-phone-notch{position:absolute;top:4px;left:50%;transform:translateX(-50%);width:16px;height:4px;background:#000;border-radius:2px}

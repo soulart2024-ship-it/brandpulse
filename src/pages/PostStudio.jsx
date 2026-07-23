@@ -12,7 +12,7 @@ const FORMATS = [
   { id:'landscape', label:'16:9 Banner', pw:320, ph:180 },
 ]
 const STEPS = ['Template','Asset','Scene','Studio']
-const FAMILIES = ['All','Minimal','Bold/Editorial','Gradient','Photo-led','Text-led']
+const FAMILIES = ['All','Minimal','Bold/Editorial','Gradient','Photo-led','Text-led','Device']
 const LOGO_POSITIONS = [
   { id:'top-left',     label:'↖' },
   { id:'top-center',   label:'↑' },
@@ -82,88 +82,271 @@ function drawLogo(ctx, w, h, logoImg, position, scale) {
   ctx.drawImage(logoImg, x, y, logoW, logoH)
 }
 
-function drawBrightStrip(ctx, w, h, img, post, brand, accent, logoImg, logoPos, logoScale, sizes=DEFAULT_TEXT_SIZES) {
-  const imgH=Math.floor(h*0.63), stripY=imgH, stripH=h-imgH
-  const pad=Math.max(12,w*0.07), tw=w-pad*2
+function renderBottomStrip(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale,sizes,cfg){
+  const ratio=cfg.splitRatio??0.62
+  const imgH=Math.floor(h*ratio), stripY=imgH, stripH=h-imgH
+  const alignL = cfg.align==='left'
+  const pad = alignL?18:Math.max(12,w*0.07)
+  const tw = w-(alignL?pad+12:pad*2)
+  const tx = alignL?pad:w/2
+
+  if(cfg.overallGradient){
+    const bgGrad=ctx.createLinearGradient(0,0,w,h)
+    bgGrad.addColorStop(0,'#0F0A1E');bgGrad.addColorStop(0.5,accent+'44');bgGrad.addColorStop(1,'#0F0A1E')
+    ctx.fillStyle=bgGrad;ctx.fillRect(0,0,w,h)
+  } else {
+    ctx.fillStyle= cfg.bg==='navy'?'#1a0f3a':'#0F0A1E'
+    ctx.fillRect(0,0,w,h)
+  }
+
+  if(img){
+    ctx.save();ctx.beginPath();ctx.rect(0,0,w,imgH);ctx.clip()
+    const s=Math.max(w/img.width,imgH/img.height)
+    ctx.drawImage(img,(w-img.width*s)/2,(imgH-img.height*s)/2,img.width*s,img.height*s)
+    ctx.restore()
+  }
+
+  if(cfg.bg==='solid'||cfg.bg==='navy'){
+    const fadeColor = cfg.bg==='solid'?accent:'#1a0f3a'
+    const fade=ctx.createLinearGradient(0,imgH-20,0,imgH+1)
+    fade.addColorStop(0,'rgba(0,0,0,0)'); fade.addColorStop(1,fadeColor)
+    ctx.fillStyle=fade; ctx.fillRect(0,imgH-20,w,22)
+    ctx.fillStyle=fadeColor; ctx.fillRect(0,stripY,w,stripH)
+  } else if(cfg.bg==='gradient'){
+    const g=ctx.createLinearGradient(0,stripY-10,0,h)
+    g.addColorStop(0,'rgba(10,5,24,0)'); g.addColorStop(0.2,'rgba(10,5,24,0.96)'); g.addColorStop(1,'#0a0518')
+    ctx.fillStyle=g; ctx.fillRect(0,stripY-10,w,stripH+10)
+  } else if(cfg.bg==='glass'){
+    ctx.fillStyle='rgba(255,255,255,0.08)'; ctx.fillRect(0,stripY,w,stripH)
+  }
+
+  if(cfg.accentShape==='bar'){ ctx.fillStyle=accent; ctx.fillRect(0,stripY+2,3,stripH-4) }
+  else if(cfg.accentShape==='topline'){ ctx.fillStyle=accent; ctx.fillRect(0,stripY,w,3) }
+  else if(cfg.accentShape==='dot'){ ctx.beginPath(); ctx.arc(w/2,stripY+10,3,0,Math.PI*2); ctx.fillStyle=accent; ctx.fill() }
+
+  let cy
+  if(cfg.kicker){
+    ctx.fillStyle= (cfg.bg==='solid')?'rgba(255,255,255,0.55)':accent
+    ctx.textAlign=alignL?'left':'center'
+    ctx.font=`700 ${Math.max(7,stripH*0.12)}px "Space Grotesk",sans-serif`
+    ctx.fillText((brand?.industry??'').toUpperCase().slice(0,18), tx, stripY+stripH*0.18)
+    cy = stripY+stripH*0.42
+  } else {
+    cy = stripY+stripH*0.40
+  }
+
+  ctx.fillStyle='#FFF'
+  fitLine(ctx,post.headline??'',tx,cy,tw,Math.max(12,stripH*0.24)*(sizes?.headline??1),'800',alignL?'left':'center')
+  ctx.fillStyle='rgba(255,255,255,0.78)'
+  fitSubtext(ctx,post.subtext??'',tx,cy+stripH*0.20,tw,stripH*0.14*(sizes?.subtext??1),Math.max(8,stripH*0.12)*(sizes?.subtext??1),alignL?'left':'center')
+
+  if(cfg.cta==='pill'){
+    const ctaW=Math.min(tw*0.6,140), ctaH=Math.max(18,stripH*0.16)
+    const ctaX= alignL?pad:(w-ctaW)/2, ctaY=h-ctaH-10
+    ctx.fillStyle= cfg.bg==='solid'?'rgba(255,255,255,0.2)':accent
+    ctx.beginPath();ctx.roundRect(ctaX,ctaY,ctaW,ctaH,ctaH/2);ctx.fill()
+    ctx.fillStyle='#FFF'
+    fitLine(ctx,post.cta??'Learn More',ctaX+ctaW/2,ctaY+ctaH*0.66,ctaW-12,Math.max(7,ctaH*0.46)*(sizes?.cta??1),'700')
+  } else if(cfg.cta==='text'){
+    ctx.fillStyle=accent; ctx.textAlign=alignL?'left':'center'
+    ctx.font=`700 ${Math.max(8,stripH*0.13)*(sizes?.cta??1)}px "Space Grotesk",sans-serif`
+    const ctaText = alignL ? '→ '+(post.cta??'Learn More') : (post.cta??'Learn More').toUpperCase()
+    ctx.fillText(ctaText, tx, h-14)
+  }
+
+  drawLogo(ctx,w,h,logoImg,logoPos,logoScale)
+}
+
+function renderSidePanel(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale,sizes,cfg){
+  const panelRatio=cfg.panelRatio??0.46
+  const side=cfg.side??'right'
+  const imgW = w*(1-panelRatio)
   ctx.fillStyle='#0F0A1E'; ctx.fillRect(0,0,w,h)
-  if(img){ctx.save();ctx.beginPath();ctx.rect(0,0,w,imgH);ctx.clip();const s=Math.max(w/img.width,imgH/img.height);ctx.drawImage(img,(w-img.width*s)/2,(imgH-img.height*s)/2,img.width*s,img.height*s);ctx.restore()}
-  const fade=ctx.createLinearGradient(0,imgH-20,0,imgH);fade.addColorStop(0,'rgba(0,0,0,0)');fade.addColorStop(1,accent);ctx.fillStyle=fade;ctx.fillRect(0,imgH-20,w,22)
-  ctx.fillStyle=accent;ctx.fillRect(0,stripY,w,stripH)
-  ctx.fillStyle='rgba(255,255,255,0.55)';ctx.textAlign='center';ctx.font=`600 ${Math.max(7,stripH*0.13)}px "Space Grotesk",sans-serif`
-  ctx.fillText((brand?.industry??'').toUpperCase().slice(0,20),w/2,stripY+stripH*0.2)
-  ctx.fillStyle='#FFF';fitLine(ctx,post.headline??'',w/2,stripY+stripH*0.47,tw,Math.max(12,stripH*0.24)*(sizes?.headline??1),'800')
-  ctx.fillStyle='rgba(255,255,255,0.8)';fitSubtext(ctx,post.subtext??'',w/2,stripY+stripH*0.67,tw,stripH*0.14*(sizes?.subtext??1),Math.max(8,stripH*0.12)*(sizes?.subtext??1))
+  const imgX = side==='right'?0:w-imgW
+  if(img){
+    ctx.save();ctx.beginPath();ctx.rect(imgX,0,imgW,h);ctx.clip()
+    const s=Math.max(imgW/img.width,h/img.height)
+    ctx.drawImage(img, imgX+(imgW-img.width*s)/2, (h-img.height*s)/2, img.width*s, img.height*s)
+    ctx.restore()
+  }
+  const panelX = side==='right'?imgW:0
+  const panelW = w-imgW
+  ctx.fillStyle=accent; ctx.fillRect(panelX,0,panelW,h)
+  if(cfg.bg==='diagonal'){
+    ctx.beginPath()
+    if(side==='right'){
+      ctx.moveTo(panelX-18,0); ctx.lineTo(panelX+6,0); ctx.lineTo(panelX-12,h); ctx.lineTo(panelX-36,h)
+    } else {
+      ctx.moveTo(panelX+panelW-6,0); ctx.lineTo(panelX+panelW+18,0); ctx.lineTo(panelX+panelW+36,h); ctx.lineTo(panelX+panelW+12,h)
+    }
+    ctx.fillStyle=accent; ctx.fill()
+  }
+  const tx = panelX + panelW*0.12
+  const tw = panelW*0.76
+  ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.textAlign='left'
+  ctx.font=`600 ${Math.max(7,h*0.031)}px "Space Grotesk",sans-serif`
+  ctx.fillText((brand?.industry??'').toUpperCase().slice(0,12), tx, h*0.16)
+  ctx.fillStyle='#FFF'
+  fitLine(ctx,post.headline??'',tx,h*0.30,tw,Math.max(11,h*0.066)*(sizes?.headline??1),'800','left')
+  ctx.fillStyle='rgba(255,255,255,0.78)'
+  fitSubtext(ctx,post.subtext??'',tx,h*0.42,tw,h*0.048*(sizes?.subtext??1),Math.max(8,h*0.036)*(sizes?.subtext??1),'left')
+  if(cfg.cta!=='none'){
+    const ctaY=h*0.72, ctaH=h*0.09, ctaW=Math.min(tw,130)
+    ctx.fillStyle='rgba(255,255,255,0.2)'; ctx.beginPath(); ctx.roundRect(tx,ctaY,ctaW,ctaH,4); ctx.fill()
+    ctx.fillStyle='#FFF'
+    fitLine(ctx,post.cta??'Learn More',tx+ctaW/2,ctaY+ctaH*0.65,ctaW-10,Math.max(7,h*0.033)*(sizes?.cta??1),'700')
+  }
   drawLogo(ctx,w,h,logoImg,logoPos,logoScale)
 }
 
-function drawDarkStrip(ctx, w, h, img, post, brand, accent, logoImg, logoPos, logoScale, sizes=DEFAULT_TEXT_SIZES) {
-  const imgH=Math.floor(h*0.60), stripY=imgH, stripH=h-imgH, kx=18, tw=w-kx-12
-  ctx.fillStyle='#0a0518'; ctx.fillRect(0,0,w,h)
-  if(img){ctx.save();ctx.beginPath();ctx.rect(0,0,w,imgH);ctx.clip();const s=Math.max(w/img.width,imgH/img.height);ctx.drawImage(img,(w-img.width*s)/2,(imgH-img.height*s)/2,img.width*s,img.height*s);ctx.restore()}
-  const grad=ctx.createLinearGradient(0,imgH-16,0,h);grad.addColorStop(0,'rgba(10,5,24,0)');grad.addColorStop(0.2,'rgba(10,5,24,0.96)');grad.addColorStop(1,'#0a0518');ctx.fillStyle=grad;ctx.fillRect(0,imgH-16,w,stripH+16)
-  ctx.fillStyle=accent;ctx.fillRect(0,stripY+2,3,stripH-4)
-  ctx.fillStyle=accent;ctx.textAlign='left';ctx.font=`700 ${Math.max(7,stripH*0.12)}px "Space Grotesk",sans-serif`
-  ctx.fillText((brand?.industry??'').toUpperCase().slice(0,16),kx,stripY+stripH*0.18)
-  ctx.fillStyle='#FFF';fitLine(ctx,post.headline??'',kx,stripY+stripH*0.40,tw,Math.max(12,stripH*0.22)*(sizes?.headline??1),'700','left');ctx.textAlign='left'
-  ctx.fillStyle='rgba(255,255,255,0.72)';fitSubtext(ctx,post.subtext??'',kx,stripY+stripH*0.60,tw,stripH*0.13*(sizes?.subtext??1),Math.max(8,stripH*0.11)*(sizes?.subtext??1),'left')
-  ctx.fillStyle=accent;ctx.textAlign='left';ctx.font=`700 ${Math.max(8,stripH*0.14)*(sizes?.cta??1)}px "Space Grotesk",sans-serif`
-  ctx.fillText('→ '+(post.cta??'Learn More'),kx,stripY+stripH*0.84)
+function renderFullOverlay(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale,sizes,cfg){
+  ctx.fillStyle='#111'; ctx.fillRect(0,0,w,h)
+  if(img){ const s=Math.max(w/img.width,h/img.height); ctx.drawImage(img,(w-img.width*s)/2,(h-img.height*s)/2,img.width*s,img.height*s) }
+
+  if(cfg.scrim==='bottom'){
+    const g=ctx.createLinearGradient(0,h*0.3,0,h); g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(0.5,'rgba(0,0,0,0.7)'); g.addColorStop(1,'rgba(0,0,0,0.92)')
+    ctx.fillStyle=g; ctx.fillRect(0,h*0.3,w,h*0.7)
+  } else if(cfg.scrim==='full'){
+    ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(0,0,w,h)
+  } else if(cfg.scrim==='vignette'){
+    const v=ctx.createRadialGradient(w/2,h/2,h*0.2,w/2,h/2,h*0.85)
+    v.addColorStop(0,'rgba(0,0,0,0)'); v.addColorStop(1,'rgba(0,0,0,0.7)')
+    ctx.fillStyle=v; ctx.fillRect(0,0,w,h)
+    const g2=ctx.createLinearGradient(0,h*0.55,0,h); g2.addColorStop(0,'rgba(0,0,0,0)'); g2.addColorStop(1,'rgba(0,0,0,0.85)')
+    ctx.fillStyle=g2; ctx.fillRect(0,h*0.55,w,h*0.45)
+  }
+
+  const alignL = cfg.align==='left'
+  const pad = alignL?16:w*0.07
+  const tw = w-(alignL?pad+12:pad*2)
+  const tx = alignL?pad:w/2
+  const hY = cfg.textPos==='center'?h*0.44:h*0.48
+  const sY = cfg.textPos==='center'?h*0.535:h*0.585
+  const cY = cfg.textPos==='center'?h*0.635:h*0.70
+
+  ctx.fillStyle='#FFF'
+  fitLine(ctx,post.headline??'',tx,hY,tw,Math.max(13,h*0.07)*(sizes?.headline??1),'800',alignL?'left':'center')
+  ctx.fillStyle='rgba(255,255,255,0.78)'
+  fitSubtext(ctx,post.subtext??'',tx,sY,tw,h*0.045*(sizes?.subtext??1),Math.max(9,h*0.038)*(sizes?.subtext??1),alignL?'left':'center')
+
+  if(cfg.cta!=='none'){
+    ctx.fillStyle=accent; ctx.font=`700 ${Math.max(8,h*0.036)*(sizes?.cta??1)}px "Space Grotesk",sans-serif`
+    ctx.textAlign=alignL?'left':'center'
+    ctx.fillText((post.cta??'Learn More').toUpperCase(), tx, cY)
+  }
+
+  ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.textAlign='left'
+  ctx.font=`600 ${Math.max(7,h*0.03)}px "Space Grotesk",sans-serif`
+  ctx.fillText((brand?.industry??'').toUpperCase().slice(0,16), 12, 20)
+
   drawLogo(ctx,w,h,logoImg,logoPos,logoScale)
 }
 
-function drawDuoStrip(ctx, w, h, img, post, brand, accent, logoImg, logoPos, logoScale, sizes=DEFAULT_TEXT_SIZES) {
-  const imgH=Math.floor(h*0.65), stripY=imgH, stripH=h-imgH, pad=Math.max(12,w*0.06), tw=w-pad*2
-  ctx.fillStyle='#0F0A1E'; ctx.fillRect(0,0,w,h)
-  if(img){ctx.save();ctx.beginPath();ctx.rect(0,0,w,imgH);ctx.clip();const s=Math.max(w/img.width,imgH/img.height);ctx.drawImage(img,(w-img.width*s)/2,(imgH-img.height*s)/2,img.width*s,img.height*s);ctx.restore()}
-  const fade=ctx.createLinearGradient(0,imgH-18,0,imgH+1);fade.addColorStop(0,'rgba(15,10,30,0)');fade.addColorStop(1,'#1a0f3a');ctx.fillStyle=fade;ctx.fillRect(0,imgH-18,w,20)
-  ctx.fillStyle='#1a0f3a';ctx.fillRect(0,stripY,w,stripH);ctx.fillStyle=accent;ctx.fillRect(0,stripY,w,3)
-  ctx.fillStyle='#FFF';fitLine(ctx,post.headline??'',w/2,stripY+stripH*0.36,tw,Math.max(12,stripH*0.26)*(sizes?.headline??1),'800')
-  ctx.fillStyle='rgba(255,255,255,0.7)';fitSubtext(ctx,post.subtext??'',w/2,stripY+stripH*0.57,tw,stripH*0.14*(sizes?.subtext??1),Math.max(8,stripH*0.12)*(sizes?.subtext??1))
-  ctx.fillStyle=accent;ctx.textAlign='center';ctx.font=`700 ${Math.max(7,stripH*0.13)*(sizes?.cta??1)}px "Space Grotesk",sans-serif`;ctx.fillText((post.cta??'Learn More').toUpperCase(),w/2,stripY+stripH*0.83)
+function renderFramedBorder(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale,sizes,cfg){
+  ctx.fillStyle=accent; ctx.fillRect(0,0,w,h)
+  const bw = cfg.borderWidth??10
+  const innerX=bw, innerY=bw, innerW=w-bw*2, innerH=h-bw*2
+  ctx.fillStyle='#0F0A1E'; ctx.fillRect(innerX,innerY,innerW,innerH)
+  const imgRatio = cfg.imgRatio??0.62
+  const imgH = innerH*imgRatio
+  if(img){
+    ctx.save(); ctx.beginPath(); ctx.rect(innerX,innerY,innerW,imgH); ctx.clip()
+    const s=Math.max(innerW/img.width, imgH/img.height)
+    ctx.drawImage(img, innerX+(innerW-img.width*s)/2, innerY+(imgH-img.height*s)/2, img.width*s, img.height*s)
+    ctx.restore()
+  }
+  const stripY = innerY+imgH, stripH = innerH-imgH
+  ctx.fillStyle='#0F0A1E'; ctx.fillRect(innerX,stripY,innerW,stripH)
+  const tw=innerW-28
+  ctx.fillStyle=accent; ctx.textAlign='center'
+  ctx.font=`600 ${Math.max(7,stripH*0.12)}px "Space Grotesk",sans-serif`
+  ctx.fillText((brand?.industry??'').toUpperCase().slice(0,18), innerX+innerW/2, stripY+stripH*0.22)
+  ctx.fillStyle='#FFF'
+  fitLine(ctx,post.headline??'',innerX+innerW/2,stripY+stripH*0.48,tw,Math.max(11,stripH*0.22)*(sizes?.headline??1),'800')
+  ctx.fillStyle='rgba(255,255,255,0.72)'
+  fitSubtext(ctx,post.subtext??'',innerX+innerW/2,stripY+stripH*0.68,tw,stripH*0.13*(sizes?.subtext??1),Math.max(8,stripH*0.11)*(sizes?.subtext??1))
   drawLogo(ctx,w,h,logoImg,logoPos,logoScale)
 }
 
-function drawBoldOverlay(ctx, w, h, img, post, brand, accent, logoImg, logoPos, logoScale, sizes=DEFAULT_TEXT_SIZES) {
-  ctx.fillStyle='#111';ctx.fillRect(0,0,w,h)
-  if(img){const s=Math.max(w/img.width,h/img.height);ctx.drawImage(img,(w-img.width*s)/2,(h-img.height*s)/2,img.width*s,img.height*s)}
-  const scrim=ctx.createLinearGradient(0,h*0.3,0,h);scrim.addColorStop(0,'rgba(0,0,0,0)');scrim.addColorStop(0.5,'rgba(0,0,0,0.7)');scrim.addColorStop(1,'rgba(0,0,0,0.92)');ctx.fillStyle=scrim;ctx.fillRect(0,h*0.3,w,h*0.7)
-  ctx.fillStyle=accent;ctx.fillRect(0,h*0.52,w,2)
-  ctx.fillStyle='#FFF';ctx.textAlign='center'
-  const pad=w*0.07, tw=w-pad*2
-  fitLine(ctx,post.headline??'',w/2,h*0.48,tw,Math.max(14,h*0.072)*(sizes?.headline??1),'800')
-  ctx.fillStyle='rgba(255,255,255,0.75)';fitSubtext(ctx,post.subtext??'',w/2,h*0.59,tw,h*0.046*(sizes?.subtext??1),Math.max(9,h*0.038)*(sizes?.subtext??1))
-  ctx.fillStyle=accent;ctx.font=`700 ${Math.max(8,h*0.038)*(sizes?.cta??1)}px "Space Grotesk",sans-serif`;ctx.textAlign='center'
-  ctx.fillText((post.cta??'Learn More').toUpperCase(),w/2,h*0.72)
-  drawLogo(ctx,w,h,logoImg,logoPos,logoScale)
-}
-
-function drawGradientFrame(ctx, w, h, img, post, brand, accent, logoImg, logoPos, logoScale, sizes=DEFAULT_TEXT_SIZES) {
+function renderPhoneMockup(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale,sizes,cfg){
   const bg=ctx.createLinearGradient(0,0,w,h)
-  bg.addColorStop(0,'#0F0A1E');bg.addColorStop(0.5,accent+'44');bg.addColorStop(1,'#0F0A1E')
-  ctx.fillStyle=bg;ctx.fillRect(0,0,w,h)
-  const imgH=Math.floor(h*0.60), stripY=imgH, stripH=h-imgH
-  if(img){ctx.save();ctx.beginPath();ctx.rect(0,0,w,imgH);ctx.clip();const s=Math.max(w/img.width,imgH/img.height);ctx.drawImage(img,(w-img.width*s)/2,(imgH-img.height*s)/2,img.width*s,img.height*s);ctx.restore()}
-  ctx.fillStyle='rgba(255,255,255,0.08)';ctx.fillRect(0,stripY,w,stripH)
-  ctx.fillStyle=accent;ctx.fillRect(0,stripY,w,2)
-  const pad=Math.max(12,w*0.07), tw=w-pad*2
-  ctx.fillStyle='#FFF';fitLine(ctx,post.headline??'',w/2,stripY+stripH*0.38,tw,Math.max(12,stripH*0.26)*(sizes?.headline??1),'800')
-  ctx.fillStyle='rgba(255,255,255,0.72)';fitSubtext(ctx,post.subtext??'',w/2,stripY+stripH*0.60,tw,stripH*0.14*(sizes?.subtext??1),Math.max(8,stripH*0.12)*(sizes?.subtext??1))
-  const ctaW=Math.min(tw*0.55,120),ctaH=Math.max(18,stripH*0.18),ctaX=(w-ctaW)/2,ctaY=stripY+stripH*0.78
-  ctx.fillStyle=accent;ctx.beginPath();ctx.roundRect(ctaX,ctaY,ctaW,ctaH,ctaH/2);ctx.fill()
-  ctx.fillStyle='#FFF';fitLine(ctx,post.cta??'Learn More',(w)/2,ctaY+ctaH*0.67,ctaW-10,Math.max(7,ctaH*0.46)*(sizes?.cta??1),'700')
+  bg.addColorStop(0,'#0F0A1E'); bg.addColorStop(1,accent+'33')
+  ctx.fillStyle=bg; ctx.fillRect(0,0,w,h)
+
+  let phoneH = h*0.60
+  let phoneW = phoneH/2.05
+  if(phoneW > w*0.48){ phoneW = w*0.48; phoneH = phoneW*2.05 }
+  const phoneX = (w-phoneW)/2
+  const phoneY = h*0.05
+  const bezel = Math.max(4, phoneW*0.05)
+  const radius = phoneW*0.16
+
+  ctx.fillStyle='#111'
+  ctx.beginPath()
+  ctx.roundRect(phoneX,phoneY,phoneW,phoneH,radius)
+  ctx.fill()
+
+  const scrX=phoneX+bezel, scrY=phoneY+bezel, scrW=phoneW-bezel*2, scrH=phoneH-bezel*2
+  ctx.save()
+  ctx.beginPath()
+  ctx.roundRect(scrX,scrY,scrW,scrH,radius*0.7)
+  ctx.clip()
+  if(img){
+    const s=Math.max(scrW/img.width, scrH/img.height)
+    ctx.drawImage(img, scrX+(scrW-img.width*s)/2, scrY+(scrH-img.height*s)/2, img.width*s, img.height*s)
+  } else {
+    ctx.fillStyle=accent; ctx.fillRect(scrX,scrY,scrW,scrH)
+  }
+  ctx.restore()
+
+  const notchW=phoneW*0.32, notchH=phoneW*0.07
+  ctx.fillStyle='#111'
+  ctx.beginPath()
+  ctx.roundRect(phoneX+(phoneW-notchW)/2, scrY+2, notchW, notchH, notchH/2)
+  ctx.fill()
+
+  const textY = phoneY+phoneH+h*0.03
+  const textH = h - textY - h*0.02
+  const tw = w*0.82
+  ctx.fillStyle='#FFF'; ctx.textAlign='center'
+  fitLine(ctx,post.headline??'',w/2,textY+textH*0.32,tw,Math.max(11,textH*0.32)*(sizes?.headline??1),'800')
+  ctx.fillStyle='rgba(255,255,255,0.75)'
+  fitSubtext(ctx,post.subtext??'',w/2,textY+textH*0.58,tw,textH*0.2*(sizes?.subtext??1),Math.max(8,textH*0.17)*(sizes?.subtext??1))
+  if(cfg.cta!=='none'){
+    ctx.fillStyle=accent; ctx.font=`700 ${Math.max(8,textH*0.19)*(sizes?.cta??1)}px "Space Grotesk",sans-serif`
+    ctx.fillText((post.cta??'Learn More').toUpperCase(), w/2, textY+textH*0.86)
+  }
   drawLogo(ctx,w,h,logoImg,logoPos,logoScale)
 }
 
-const TEMPLATES = [
-  { id:'bright',   label:'Bright Strip',   family:'Minimal',        draw:drawBrightStrip,   accent:'#7C3AED', splitRatio:0.63, layout:'bottom' },
-  { id:'dark',     label:'Dark Strip',     family:'Bold/Editorial', draw:drawDarkStrip,     accent:'#06B6D4', splitRatio:0.60, layout:'bottom' },
-  { id:'duo',      label:'Duo Strip',      family:'Text-led',       draw:drawDuoStrip,      accent:'#F472B6', splitRatio:0.65, layout:'bottom' },
-  { id:'bold',     label:'Bold Overlay',   family:'Photo-led',      draw:drawBoldOverlay,   accent:'#F59E0B', splitRatio:1.0,  layout:'overlay' },
-  { id:'gradient', label:'Gradient Frame', family:'Gradient',       draw:drawGradientFrame, accent:'#10B981', splitRatio:0.60, layout:'bottom' },
+const RENDERERS = { bottomStrip: renderBottomStrip, sidePanel: renderSidePanel, fullOverlay: renderFullOverlay, framedBorder: renderFramedBorder, phoneMockup: renderPhoneMockup }
+
+function makeDraw(layout, style) {
+  return (ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale,sizes) => RENDERERS[layout](ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale,sizes,style)
+}
+
+const TEMPLATES_RAW = [
+  { id:'bright', label:'Bright Strip', family:'Minimal', accent:'#7C3AED', layout:'bottomStrip', style:{splitRatio:0.63,bg:'solid',align:'center',cta:'none',accentShape:'none',kicker:true}, preview:{type:'strip',ratio:0.63} },
+  { id:'dark', label:'Dark Strip', family:'Bold/Editorial', accent:'#06B6D4', layout:'bottomStrip', style:{splitRatio:0.60,bg:'gradient',align:'left',cta:'text',accentShape:'bar',kicker:true}, preview:{type:'strip',ratio:0.60} },
+  { id:'duo', label:'Duo Strip', family:'Text-led', accent:'#F472B6', layout:'bottomStrip', style:{splitRatio:0.65,bg:'navy',align:'center',cta:'text',accentShape:'topline',kicker:false}, preview:{type:'strip',ratio:0.65} },
+  { id:'gradient', label:'Gradient Frame', family:'Gradient', accent:'#10B981', layout:'bottomStrip', style:{splitRatio:0.60,bg:'glass',align:'center',cta:'pill',accentShape:'topline',kicker:false,overallGradient:true}, preview:{type:'strip',ratio:0.60} },
+  { id:'soft-pastel', label:'Soft Pastel', family:'Minimal', accent:'#A78BFA', layout:'bottomStrip', style:{splitRatio:0.60,bg:'glass',align:'center',cta:'pill',accentShape:'dot',kicker:true}, preview:{type:'strip',ratio:0.60} },
+  { id:'editorial-bold', label:'Editorial Bold', family:'Bold/Editorial', accent:'#EF4444', layout:'bottomStrip', style:{splitRatio:0.55,bg:'navy',align:'left',cta:'pill',accentShape:'bar',kicker:true}, preview:{type:'strip',ratio:0.55} },
+  { id:'statement', label:'Statement', family:'Text-led', accent:'#FBBF24', layout:'bottomStrip', style:{splitRatio:0.45,bg:'solid',align:'center',cta:'text',accentShape:'none',kicker:false}, preview:{type:'strip',ratio:0.45} },
+  { id:'side-right', label:'Side Panel', family:'Bold/Editorial', accent:'#3B82F6', layout:'sidePanel', style:{panelRatio:0.46,side:'right',bg:'solid',cta:'pill'}, preview:{type:'side',side:'right'} },
+  { id:'side-diagonal', label:'Diagonal Panel', family:'Gradient', accent:'#EC4899', layout:'sidePanel', style:{panelRatio:0.48,side:'right',bg:'diagonal',cta:'pill'}, preview:{type:'side',side:'right'} },
+  { id:'bold', label:'Bold Overlay', family:'Photo-led', accent:'#F59E0B', layout:'fullOverlay', style:{scrim:'bottom',textPos:'bottom',align:'center',cta:'text'}, preview:{type:'overlay'} },
+  { id:'vignette', label:'Vignette Frame', family:'Photo-led', accent:'#8B5CF6', layout:'fullOverlay', style:{scrim:'vignette',textPos:'bottom',align:'left',cta:'text'}, preview:{type:'overlay'} },
+  { id:'center-statement', label:'Center Statement', family:'Text-led', accent:'#14B8A6', layout:'fullOverlay', style:{scrim:'full',textPos:'center',align:'center',cta:'text'}, preview:{type:'overlay'} },
+  { id:'framed', label:'Framed Card', family:'Minimal', accent:'#F97316', layout:'framedBorder', style:{borderWidth:10,imgRatio:0.62}, preview:{type:'framed'} },
+  { id:'app-screen', label:'App Screen', family:'Device', accent:'#6366F1', layout:'phoneMockup', style:{cta:'text'}, preview:{type:'phone'} },
 ]
 
+const TEMPLATES = TEMPLATES_RAW.map(t => ({ ...t, draw: makeDraw(t.layout, t.style) }))
+
 function TemplateThumb({ tmpl }) {
-  if (tmpl.layout === 'overlay') {
+  const p = tmpl.preview
+  if (p.type === 'overlay') {
     return (
       <div className="tmpl-thumb tmpl-thumb-overlay">
         <div className="tmpl-thumb-img" style={{height:'100%'}} />
@@ -172,10 +355,35 @@ function TemplateThumb({ tmpl }) {
       </div>
     )
   }
+  if (p.type === 'side') {
+    return (
+      <div className="tmpl-thumb tmpl-thumb-side" style={{flexDirection: p.side==='right'?'row':'row-reverse'}}>
+        <div className="tmpl-thumb-img" style={{width:'55%',height:'100%'}} />
+        <div className="tmpl-thumb-panel" style={{width:'45%',height:'100%',background:tmpl.accent}} />
+      </div>
+    )
+  }
+  if (p.type === 'framed') {
+    return (
+      <div className="tmpl-thumb tmpl-thumb-framed" style={{background:tmpl.accent}}>
+        <div className="tmpl-thumb-framed-inner">
+          <div className="tmpl-thumb-img" style={{height:'62%'}} />
+          <div className="tmpl-thumb-strip" style={{height:'38%',background:'#0F0A1E'}} />
+        </div>
+      </div>
+    )
+  }
+  if (p.type === 'phone') {
+    return (
+      <div className="tmpl-thumb tmpl-thumb-phone-wrap" style={{background:`linear-gradient(135deg,#2a2040,${tmpl.accent}55)`}}>
+        <div className="tmpl-thumb-phone"><div className="tmpl-thumb-phone-notch" /></div>
+      </div>
+    )
+  }
   return (
     <div className="tmpl-thumb">
-      <div className="tmpl-thumb-img" style={{height:`${tmpl.splitRatio*100}%`}} />
-      <div className="tmpl-thumb-strip" style={{height:`${(1-tmpl.splitRatio)*100}%`,background:tmpl.accent}} />
+      <div className="tmpl-thumb-img" style={{height:`${p.ratio*100}%`}} />
+      <div className="tmpl-thumb-strip" style={{height:`${(1-p.ratio)*100}%`,background:tmpl.accent}} />
     </div>
   )
 }
