@@ -1,16 +1,25 @@
 import { useState } from 'react'
-import { Calendar as CalIcon, Plus, X, Sparkles } from 'lucide-react'
+import { Calendar as CalIcon, Plus, X, Sparkles, RefreshCw, Send } from 'lucide-react'
 import { callClaude } from '../lib/api.js'
 import './Page.css'
 
 const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
 const COLORS = ['violet','electric','rose','gold']
 
+// Convert JS getDay() (Sun=0..Sat=6) to our Mon-first index (Mon=0..Sun=6)
+function toMonFirst(jsDay) { return jsDay === 0 ? 6 : jsDay - 1 }
+
 export default function Calendar({ brand }) {
   const [posts, setPosts] = useState({})
   const [adding, setAdding] = useState(null)
   const [draft, setDraft] = useState({platform:'Instagram',text:'',color:0})
   const [aiLoading, setAiLoading] = useState(false)
+
+  const [bufferPosts, setBufferPosts] = useState({})
+  const [channels, setChannels] = useState([])
+  const [loadingBuffer, setLoadingBuffer] = useState(false)
+  const [bufferError, setBufferError] = useState('')
+  const [bufferLoaded, setBufferLoaded] = useState(false)
 
   const save = () => {
     if (!draft.text) return
@@ -39,22 +48,78 @@ export default function Calendar({ brand }) {
     setAiLoading(false)
   }
 
+  const loadBuffer = async () => {
+    setLoadingBuffer(true); setBufferError('')
+    try {
+      const res = await fetch('/api/buffer?posts=true')
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setChannels(data.channels || [])
+
+      const grouped = {}
+      ;(data.posts || []).forEach(p => {
+        if (!p.dueAt) return
+        const dayIdx = toMonFirst(new Date(p.dueAt).getDay())
+        const channel = (data.channels || []).find(c => c.id === p.channelId)
+        if (!grouped[dayIdx]) grouped[dayIdx] = []
+        grouped[dayIdx].push({
+          id: p.id,
+          text: p.text,
+          dueAt: p.dueAt,
+          platform: channel?.service || 'Buffer',
+          channelName: channel?.name || ''
+        })
+      })
+      setBufferPosts(grouped)
+      setBufferLoaded(true)
+    } catch(e) {
+      setBufferError(e.message || 'Could not load Buffer posts — check BUFFER_API_KEY in Vercel.')
+    }
+    setLoadingBuffer(false)
+  }
+
+  const formatTime = (iso) => {
+    try { return new Date(iso).toLocaleString(undefined, { weekday:'short', hour:'2-digit', minute:'2-digit' }) }
+    catch { return '' }
+  }
+
   return (
     <div className="page">
       <div className="page-header">
         <CalIcon size={24} className="page-icon-electric"/>
-        <div><h2>Content Calendar</h2><p>Plan your weekly social media posts.</p></div>
+        <div><h2>Content Calendar</h2><p>Plan your weekly social media posts, or view what's scheduled in Buffer.</p></div>
       </div>
-      <div className="card" style={{padding:'14px 20px'}}>
+
+      <div className="card" style={{padding:'14px 20px',display:'flex',gap:10,flexWrap:'wrap',alignItems:'center'}}>
         <button className="btn btn-primary" onClick={aiSchedule} disabled={aiLoading}>
           {aiLoading?<><span className="spinner"/> Generating…</>:<><Sparkles size={14}/> AI Fill Week</>}
         </button>
+        <button className="btn btn-secondary" onClick={loadBuffer} disabled={loadingBuffer}>
+          {loadingBuffer?<><span className="spinner"/> Loading…</>:<><Send size={14}/> {bufferLoaded?'Refresh from Buffer':'Load from Buffer'}</>}
+        </button>
+        {bufferLoaded && <span style={{fontSize:11,color:'var(--success)'}}>✓ {Object.values(bufferPosts).flat().length} scheduled posts loaded</span>}
       </div>
+      {bufferError && <p className="scan-error" style={{marginTop:-8}}>{bufferError}</p>}
+
       <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:10}}>
         {DAYS.map((day,i)=>(
-          <div key={day} className="card" style={{padding:12,display:'flex',flexDirection:'column',gap:8,minHeight:160}}>
+          <div key={day} className="card" style={{padding:12,display:'flex',flexDirection:'column',gap:8,minHeight:180}}>
             <div style={{fontSize:11,fontWeight:700,color:'var(--text-mid)',fontFamily:'Space Grotesk',textTransform:'uppercase'}}>{day}</div>
             <div style={{flex:1,display:'flex',flexDirection:'column',gap:6}}>
+
+              {/* Buffer-sourced posts — shown first, distinct styling */}
+              {(bufferPosts[i]??[]).map(post=>(
+                <div key={post.id} style={{borderRadius:8,padding:'6px 8px',position:'relative',background:'rgba(6,182,212,0.1)',border:'1px solid rgba(6,182,212,0.35)'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:2}}>
+                    <Send size={9} style={{color:'var(--electric)'}}/>
+                    <span style={{fontSize:9,fontWeight:700,color:'var(--electric)',textTransform:'uppercase'}}>{post.platform}</span>
+                  </div>
+                  <p style={{fontSize:11,color:'var(--text-hi)',lineHeight:1.4,display:'-webkit-box',WebkitLineClamp:3,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{post.text}</p>
+                  <p style={{fontSize:9,color:'var(--text-lo)',marginTop:3}}>{formatTime(post.dueAt)}</p>
+                </div>
+              ))}
+
+              {/* Manually-added / AI-drafted posts */}
               {(posts[i]??[]).map(post=>(
                 <div key={post.id} style={{borderRadius:8,padding:'6px 8px',position:'relative',background:`rgba(${post.color===0?'124,58,237':post.color===1?'6,182,212':post.color===2?'244,114,182':'251,191,36'},0.15)`,border:`1px solid rgba(${post.color===0?'124,58,237':post.color===1?'6,182,212':post.color===2?'244,114,182':'251,191,36'},0.3)`}}>
                   <div style={{fontSize:9,fontWeight:700,color:'var(--text-mid)',textTransform:'uppercase',marginBottom:2}}>{post.platform}</div>
@@ -69,6 +134,7 @@ export default function Calendar({ brand }) {
           </div>
         ))}
       </div>
+
       {adding!==null&&(
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200,backdropFilter:'blur(4px)'}} onClick={()=>setAdding(null)}>
           <div className="card" style={{width:'min(480px,calc(100vw - 40px))',display:'flex',flexDirection:'column',gap:16,padding:28}} onClick={e=>e.stopPropagation()}>

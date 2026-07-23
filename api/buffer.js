@@ -1,5 +1,6 @@
 // api/buffer.js — Vercel serverless function
-// Creates a scheduled post in Buffer using a Personal API Key
+// GET  — lists connected channels; add ?posts=true to also fetch scheduled posts
+// POST — creates a scheduled post
 // Add BUFFER_API_KEY to Vercel Environment Variables
 
 export default async function handler(req, res) {
@@ -11,49 +12,62 @@ export default async function handler(req, res) {
   const apiKey = process.env.BUFFER_API_KEY
   if (!apiKey) return res.status(500).json({ error: 'BUFFER_API_KEY not configured in Vercel' })
 
-  // GET — list connected channels (so the user can pick which one to post to)
+  const callBuffer = async (query) => {
+    const response = await fetch('https://api.buffer.com', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ query })
+    })
+    const data = await response.json()
+    if (data.errors) throw new Error(data.errors[0]?.message || 'Buffer API error')
+    return data.data
+  }
+
   if (req.method === 'GET') {
     try {
-      const query = `
+      const channelsData = await callBuffer(`
         query GetChannels {
           organizations {
             id
-            channels {
-              id
-              name
-              service
-              avatar
-            }
+            channels { id name service avatar }
           }
         }
-      `
-      const response = await fetch('https://api.buffer.com', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({ query })
-      })
-      const data = await response.json()
-      if (data.errors) return res.status(400).json({ error: data.errors[0]?.message || 'Buffer API error' })
+      `)
 
-      const channels = (data.data?.organizations || []).flatMap(org => org.channels || [])
-      return res.status(200).json({ channels })
+      const orgs = channelsData?.organizations || []
+      const organizationId = orgs[0]?.id || null
+      const channels = orgs.flatMap(org => org.channels || [])
+
+      let posts = []
+      if (req.query.posts === 'true' && organizationId && channels.length > 0) {
+        const channelIds = channels.map(c => `"${c.id}"`).join(',')
+        const postsData = await callBuffer(`
+          query GetScheduledPosts {
+            posts(
+              first: 50
+              input: {
+                organizationId: "${organizationId}"
+                filter: { status: [scheduled], channelIds: [${channelIds}] }
+                sort: [{ field: dueAt, direction: asc }]
+              }
+            ) {
+              edges { node { id text status dueAt channelId } }
+            }
+          }
+        `)
+        posts = (postsData?.posts?.edges || []).map(e => e.node)
+      }
+
+      return res.status(200).json({ channels, organizationId, posts })
     } catch (err) {
       return res.status(500).json({ error: err.message })
     }
   }
 
-  // POST — create a scheduled post
   if (req.method === 'POST') {
     try {
       const { text, channelId, imageUrl, dueAt, mode = 'addToQueue' } = req.body
       if (!text || !channelId) return res.status(400).json({ error: 'text and channelId are required' })
-
-      const media = imageUrl ? {
-        media: [{ type: 'image', url: imageUrl }]
-      } : {}
 
       const inputFields = [
         `text: ${JSON.stringify(text)}`,
@@ -66,6 +80,8 @@ export default async function handler(req, res) {
       }
       if (imageUrl) {
         inputFields.push(`media: { assets: [{ type: image, url: ${JSON.stringify(imageUrl)} }] }`)
+      } else {
+        inputFields.push(`assets: []`)
       }
 
       const mutation = `
@@ -81,19 +97,8 @@ export default async function handler(req, res) {
         }
       `
 
-      const response = await fetch('https://api.buffer.com', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({ query: mutation })
-      })
-
-      const data = await response.json()
-      if (data.errors) return res.status(400).json({ error: data.errors[0]?.message || 'Buffer API error' })
-
-      const result = data.data?.createPost
+      const data = await callBuffer(mutation)
+      const result = data?.createPost
       if (result?.message) return res.status(400).json({ error: result.message })
 
       return res.status(200).json({ success: true, post: result?.post })
