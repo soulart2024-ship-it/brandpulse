@@ -51,6 +51,23 @@ export default function VideoHub({ assets }) {
   const [error, setError] = useState('')
   const fileRef = useRef()
 
+  // Captioning (client-side burn-in)
+  const [captionText, setCaptionText] = useState('')
+  const [rendering, setRendering] = useState(false)
+  const [renderProgress, setRenderProgress] = useState(0)
+  const [captionedUrl, setCaptionedUrl] = useState(null)
+
+  // Buffer
+  const [bufferChannels, setBufferChannels] = useState([])
+  const [loadingChannels, setLoadingChannels] = useState(false)
+  const [bufferChannelId, setBufferChannelId] = useState('')
+  const [postText, setPostText] = useState('')
+  const [scheduleDate, setScheduleDate] = useState('')
+  const [scheduling, setScheduling] = useState(false)
+  const [scheduleError, setScheduleError] = useState('')
+  const [scheduleSuccess, setScheduleSuccess] = useState(false)
+  const [generatingCaption, setGeneratingCaption] = useState(false)
+
   const photo = assets?.find(a => a.id === photoId)
 
   const handleUpload = (files) => {
@@ -67,7 +84,7 @@ export default function VideoHub({ assets }) {
   const generateVideo = async () => {
     const imageSource = photoUrl || photo?.url
     if (!imageSource) { setError('Upload a photo or pick one from your library first.'); return }
-    setGenerating(true); setError(''); setVideoUrl(null)
+    setGenerating(true); setError(''); setVideoUrl(null); setCaptionedUrl(null)
     try {
       const body = {
         prompt: motionPrompt || 'subtle natural motion, cinematic, professional commercial video',
@@ -90,6 +107,76 @@ export default function VideoHub({ assets }) {
       setError(e.message || 'Could not generate video — check your FAL_KEY in Vercel.')
     }
     setGenerating(false)
+  }
+
+  const burnCaption = async () => {
+    if (!videoUrl || !captionText) return
+    setRendering(true); setRenderProgress(0); setCaptionedUrl(null)
+    try {
+      const vid = document.createElement('video')
+      vid.crossOrigin = 'anonymous'
+      vid.src = videoUrl
+      vid.muted = false
+
+      await new Promise((resolve, reject) => {
+        vid.onloadedmetadata = resolve
+        vid.onerror = () => reject(new Error('Could not load video for captioning'))
+      })
+
+      const canvas = document.createElement('canvas')
+      canvas.width = vid.videoWidth
+      canvas.height = vid.videoHeight
+      const ctx = canvas.getContext('2d')
+
+      const canvasStream = canvas.captureStream(30)
+      let audioTracks = []
+      try {
+        const vidStream = vid.captureStream ? vid.captureStream() : null
+        if (vidStream) audioTracks = vidStream.getAudioTracks()
+      } catch(e) { /* no audio available */ }
+
+      const combined = new MediaStream([...canvasStream.getVideoTracks(), ...audioTracks])
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+        ? 'video/webm;codecs=vp9,opus' : 'video/webm'
+      const recorder = new MediaRecorder(combined, { mimeType })
+      const chunks = []
+      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' })
+        setCaptionedUrl(URL.createObjectURL(blob))
+        setRendering(false)
+      }
+
+      const strip = canvas.height * 0.22
+      const drawFrame = () => {
+        if (vid.paused || vid.ended) { recorder.stop(); return }
+        ctx.drawImage(vid, 0, 0, canvas.width, canvas.height)
+        const stripY = canvas.height - strip
+        const grad = ctx.createLinearGradient(0, stripY - 30, 0, canvas.height)
+        grad.addColorStop(0, 'rgba(0,0,0,0)'); grad.addColorStop(1, 'rgba(0,0,0,0.85)')
+        ctx.fillStyle = grad
+        ctx.fillRect(0, stripY - 30, canvas.width, strip + 30)
+        ctx.fillStyle = '#FFFFFF'
+        ctx.textAlign = 'center'
+        let fontSize = Math.max(14, canvas.height * 0.045)
+        ctx.font = `700 ${fontSize}px "Space Grotesk",sans-serif`
+        while (ctx.measureText(captionText).width > canvas.width * 0.88 && fontSize > 10) {
+          fontSize -= 1
+          ctx.font = `700 ${fontSize}px "Space Grotesk",sans-serif`
+        }
+        ctx.fillText(captionText, canvas.width / 2, canvas.height - strip / 2 + fontSize / 3)
+        setRenderProgress(Math.min(100, Math.round((vid.currentTime / vid.duration) * 100)))
+        requestAnimationFrame(drawFrame)
+      }
+
+      vid.currentTime = 0
+      recorder.start()
+      await vid.play()
+      requestAnimationFrame(drawFrame)
+    } catch(e) {
+      setError(e.message || 'Could not add captions to this video.')
+      setRendering(false)
+    }
   }
 
   const generateCaption = async () => {
@@ -151,7 +238,7 @@ export default function VideoHub({ assets }) {
 
       <div className="card form-card">
         <h3><Wand2 size={15} style={{color:'var(--gold)'}}/> Animate a photo — powered by Kling</h3>
-        <p className="form-hint">Upload a photo or pick one from your Asset Library, describe the motion you want, and Kling turns it into a short video clip. Costs a small amount per generation via your Fal.ai credit.</p>
+        <p className="form-hint">Upload a photo or pick one from your Asset Library, describe the motion you want, and Kling turns it into a short video clip.</p>
 
         <div className="scan-row">
           <input value={photoUrl.startsWith('data:') ? '' : photoUrl} onChange={e=>{setPhotoUrl(e.target.value); setPhotoId(null)}}
@@ -211,6 +298,71 @@ export default function VideoHub({ assets }) {
             <a href={videoUrl} download target="_blank" rel="noopener noreferrer" className="btn btn-secondary" style={{marginTop:10,justifyContent:'center'}}>
               <Download size={14}/> Download Video
             </a>
+
+            {/* Buffer scheduling — uses the direct Kling video URL (real public link) */}
+            <div className="logo-panel" style={{marginTop:14}}>
+              <div className="logo-panel-header">
+                <div style={{display:'flex',alignItems:'center',gap:8}}><Send size={15} style={{color:'var(--electric)'}}/><strong style={{fontSize:13,fontFamily:'Space Grotesk'}}>Send to Buffer</strong></div>
+                {bufferChannels.length===0 && (
+                  <button className="btn btn-secondary" style={{fontSize:12,padding:'6px 12px'}} onClick={fetchBufferChannels} disabled={loadingChannels}>
+                    {loadingChannels?<span className="spinner"/>:'Connect Channels'}
+                  </button>
+                )}
+              </div>
+              {bufferChannels.length>0 && (
+                <div className="logo-controls animate-slide-up">
+                  <div className="field">
+                    <label>Post to channel</label>
+                    <div className="chip-grid">
+                      {bufferChannels.map(ch=>(
+                        <button key={ch.id} className={`chip ${bufferChannelId===ch.id?'chip-active':''}`} onClick={()=>setBufferChannelId(ch.id)}>
+                          {ch.name} <span style={{opacity:0.6,fontSize:10}}>({ch.service})</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="field">
+                    <label>Post text</label>
+                    <div style={{display:'flex',gap:8,alignItems:'flex-start'}}>
+                      <textarea rows={3} value={postText} onChange={e=>setPostText(e.target.value)} placeholder="Caption for this video post..." style={{flex:1}}/>
+                      <button className="btn btn-secondary" style={{fontSize:11,padding:'6px 10px',flexShrink:0}} onClick={generateCaption} disabled={generatingCaption}>
+                        {generatingCaption?<span className="spinner"/>:'AI Write'}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="field">
+                    <label>Schedule for (leave blank to add to next queue slot)</label>
+                    <input type="datetime-local" value={scheduleDate} onChange={e=>setScheduleDate(e.target.value)}/>
+                  </div>
+                  <button className="btn btn-primary" onClick={sendVideoToBuffer} disabled={scheduling || !bufferChannelId}>
+                    {scheduling?<span className="spinner"/>:scheduleSuccess?<><Check size={14}/> Sent!</>:<><Send size={14}/> Schedule Video</>}
+                  </button>
+                </div>
+              )}
+              {scheduleError && <p className="scan-error">{scheduleError}</p>}
+            </div>
+
+            {/* Caption burn-in — local only, download as separate file */}
+            <div className="field" style={{marginTop:14}}>
+              <label>Add a burned-in caption to the video (optional, for download only)</label>
+              <input value={captionText} onChange={e=>setCaptionText(e.target.value)} placeholder="e.g. New season, new you"/>
+            </div>
+            <button className="btn btn-primary" onClick={burnCaption} disabled={rendering || !captionText}>
+              {rendering ? <><span className="spinner"/> Rendering captions… {renderProgress}%</> : <>Add Caption to Video</>}
+            </button>
+
+            {captionedUrl && (
+              <div className="scene-result animate-slide-up" style={{marginTop:10}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+                  <Check size={14} style={{color:'var(--success)'}}/><strong style={{fontSize:13}}>✓ Captioned video ready</strong>
+                </div>
+                <video src={captionedUrl} controls autoPlay loop muted className="scene-preview-img" style={{maxHeight:400}}/>
+                <a href={captionedUrl} download="brandpulse-captioned.webm" className="btn btn-secondary" style={{marginTop:10,justifyContent:'center'}}>
+                  <Download size={14}/> Download Captioned Video
+                </a>
+                <p className="form-hint" style={{marginTop:6}}>Note: captioned video is local-only and can't be sent to Buffer yet — use the "Send to Buffer" panel above for the original uncaptioned video.</p>
+              </div>
+            )}
           </div>
         )}
       </div>
