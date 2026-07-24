@@ -78,8 +78,9 @@ export default async function handler(req, res) {
       if (mode === 'customScheduled' && dueAt) {
         inputFields.push(`dueAt: ${JSON.stringify(dueAt)}`)
       }
+      const mediaType = req.body.mediaType === 'video' ? 'video' : 'image'
       if (imageUrl) {
-        inputFields.push(`media: { assets: [{ type: image, url: ${JSON.stringify(imageUrl)} }] }`)
+        inputFields.push(`media: { assets: [{ type: ${mediaType}, url: ${JSON.stringify(imageUrl)} }] }`)
       } else {
         inputFields.push(`assets: []`)
       }

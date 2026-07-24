@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
-import { Video, ExternalLink, Upload, X, Wand2, Download, Check } from 'lucide-react'
+import { Video, ExternalLink, Upload, X, Wand2, Download, Check, Send } from 'lucide-react'
+import { callClaude, extractJSON } from '../lib/api.js'
 import './Page.css'
 
 const TOOLS = [
@@ -89,6 +90,56 @@ export default function VideoHub({ assets }) {
       setError(e.message || 'Could not generate video — check your FAL_KEY in Vercel.')
     }
     setGenerating(false)
+  }
+
+  const generateCaption = async () => {
+    setGeneratingCaption(true)
+    try {
+      const result = await callClaude({
+        system: 'Social media copywriter. Return JSON only: {"caption":"engaging caption with emojis for a short video post","hashtags":["tag1","tag2","tag3","tag4","tag5"]}',
+        messages: [{ role:'user', content: `Write a caption for a short video post. Video motion description: ${motionPrompt || 'lifestyle product video'}.` }],
+        max_tokens: 400
+      })
+      const parsed = extractJSON(result)
+      const hashtags = (parsed.hashtags||[]).map(h=>h.startsWith('#')?h:'#'+h).join(' ')
+      setPostText(`${parsed.caption}\n\n${hashtags}`)
+    } catch(e) { setScheduleError('Could not generate caption — write one manually below.') }
+    setGeneratingCaption(false)
+  }
+
+  const fetchBufferChannels = async () => {
+    setLoadingChannels(true); setScheduleError('')
+    try {
+      const res = await fetch('/api/buffer')
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setBufferChannels(data.channels || [])
+      if (data.channels?.[0]) setBufferChannelId(data.channels[0].id)
+    } catch(e) { setScheduleError(e.message || 'Could not load Buffer channels.') }
+    setLoadingChannels(false)
+  }
+
+  const sendVideoToBuffer = async () => {
+    if (!videoUrl || !bufferChannelId) { setScheduleError('Pick a channel first.'); return }
+    setScheduling(true); setScheduleError(''); setScheduleSuccess(false)
+    try {
+      const body = {
+        text: postText || captionText || 'New video post',
+        channelId: bufferChannelId,
+        imageUrl: videoUrl,
+        mediaType: 'video',
+        mode: scheduleDate ? 'customScheduled' : 'addToQueue',
+        ...(scheduleDate && { dueAt: new Date(scheduleDate).toISOString() })
+      }
+      const res = await fetch('/api/buffer', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) throw new Error(data.error || 'Failed to schedule video')
+      setScheduleSuccess(true)
+      setTimeout(() => setScheduleSuccess(false), 4000)
+    } catch(e) { setScheduleError(e.message || 'Failed to send video to Buffer.') }
+    setScheduling(false)
   }
 
   return (
