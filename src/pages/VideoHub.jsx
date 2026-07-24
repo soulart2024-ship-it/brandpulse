@@ -21,6 +21,25 @@ async function toBase64(url) {
   })
 }
 
+async function compressImage(dataUrl, maxDim = 1280, quality = 0.85) {
+  return new Promise((resolve) => {
+    const img = new window.Image()
+    img.onload = () => {
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.width * scale)
+      canvas.height = Math.round(img.height * scale)
+      const ctx = canvas.getContext('2d')
+      ctx.fillStyle = '#FFFFFF'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      resolve(canvas.toDataURL('image/jpeg', quality))
+    }
+    img.onerror = () => resolve(dataUrl)
+    img.src = dataUrl
+  })
+}
+
 export default function VideoHub({ assets }) {
   const [photoId, setPhotoId] = useState(null)
   const [photoUrl, setPhotoUrl] = useState('')
@@ -53,8 +72,12 @@ export default function VideoHub({ assets }) {
         prompt: motionPrompt || 'subtle natural motion, cinematic, professional commercial video',
         duration
       }
-      if (imageSource.startsWith('data:')) body.imageBase64 = imageSource
-      else body.imageUrl = imageSource
+      if (imageSource.startsWith('data:')) {
+        body.imageBase64 = await compressImage(imageSource)
+      } else {
+        const raw = await toBase64(imageSource)
+        body.imageBase64 = await compressImage(raw)
+      }
 
       const res = await fetch('/api/generate-video', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
