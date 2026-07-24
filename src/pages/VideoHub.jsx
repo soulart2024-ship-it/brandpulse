@@ -46,6 +46,7 @@ export default function VideoHub({ assets }) {
   const [photoUrl, setPhotoUrl] = useState('')
   const [motionPrompt, setMotionPrompt] = useState('')
   const [duration, setDuration] = useState('5')
+  const [aspectRatio, setAspectRatio] = useState('9:16')
   const [generating, setGenerating] = useState(false)
   const [videoUrl, setVideoUrl] = useState(null)
   const [error, setError] = useState('')
@@ -88,7 +89,8 @@ export default function VideoHub({ assets }) {
     try {
       const body = {
         prompt: motionPrompt || 'subtle natural motion, cinematic, professional commercial video',
-        duration
+        duration,
+        aspectRatio
       }
       if (imageSource.startsWith('data:')) {
         body.imageBase64 = await compressImage(imageSource)
@@ -281,6 +283,15 @@ export default function VideoHub({ assets }) {
           <label>Duration</label>
           <div className="chip-grid">
             {['5','10'].map(d=><button key={d} className={`chip ${duration===d?'chip-active':''}`} onClick={()=>setDuration(d)}>{d} seconds</button>)}
+          </div>
+        </div>
+
+        <div className="field">
+          <label>Aspect ratio — match your photo's shape for best results</label>
+          <div className="chip-grid">
+            {[{v:'9:16',l:'Portrait 9:16'},{v:'1:1',l:'Square 1:1'},{v:'16:9',l:'Landscape 16:9'}].map(o=>
+              <button key={o.v} className={`chip ${aspectRatio===o.v?'chip-active':''}`} onClick={()=>setAspectRatio(o.v)}>{o.l}</button>
+            )}
           </div>
         </div>
 

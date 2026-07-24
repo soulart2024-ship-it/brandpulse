@@ -1,7 +1,5 @@
 // api/generate-video.js — Vercel serverless function
 // Animates a still image into a short video using Kling (via Fal.ai)
-// Uses the same FAL_KEY already configured for image generation
-// No new account or billing needed
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -14,12 +12,11 @@ export default async function handler(req, res) {
   if (!falKey) return res.status(500).json({ error: 'FAL_KEY not configured in Vercel' })
 
   try {
-    const { imageUrl, imageBase64, prompt, duration = '5' } = req.body
+    const { imageUrl, imageBase64, prompt, duration = '5', aspectRatio = '9:16' } = req.body
 
     let imageDataUrl = imageBase64 || imageUrl
     if (!imageDataUrl) return res.status(400).json({ error: 'imageUrl or imageBase64 required' })
 
-    // If it's a remote URL (not base64), fetch and convert so Kling can access it reliably
     if (imageDataUrl.startsWith('http')) {
       const imgRes = await fetch(imageDataUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } })
       if (!imgRes.ok) return res.status(502).json({ error: `Could not fetch image (${imgRes.status})` })
@@ -28,7 +25,9 @@ export default async function handler(req, res) {
       imageDataUrl = `data:${mime};base64,${Buffer.from(buffer).toString('base64')}`
     }
 
-    // Kling v2.5 Turbo — good quality/cost balance for social content
+    const validRatios = ['16:9', '9:16', '1:1']
+    const ratio = validRatios.includes(aspectRatio) ? aspectRatio : '9:16'
+
     const response = await fetch('https://fal.run/fal-ai/kling-video/v2.5-turbo/pro/image-to-video', {
       method: 'POST',
       headers: {
@@ -39,7 +38,7 @@ export default async function handler(req, res) {
         image_url: imageDataUrl,
         prompt: prompt || 'subtle natural motion, cinematic, professional commercial video',
         duration,
-        aspect_ratio: '9:16'
+        aspect_ratio: ratio
       })
     })
 
