@@ -628,7 +628,11 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
       if (hasPhoto) {
         body.mode='edit'; body.productName=productInfo?.name||photo?.name||'product'
         if (photoUrl) { body.imageUrl=photoUrl }
-        else if (photo) { body.imageBase64=photo.url.startsWith('data:')?photo.url:await toBase64(photo.url); body.imageType=photo.type||'image/jpeg' }
+        else if (photo) {
+          const raw = photo.url.startsWith('data:')?photo.url:await toBase64(photo.url)
+          body.imageBase64 = await compressImage(raw)
+          body.imageType = 'image/jpeg'
+        }
       }
       const res = await fetch('/api/generate-image', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) })
       const data = await res.json()
