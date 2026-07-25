@@ -38,6 +38,63 @@ async function toBase64(url) {
   })
 }
 
+function stripIccProfile(dataUrl) {
+  try {
+    const commaIdx = dataUrl.indexOf(',')
+    const header = dataUrl.slice(0, commaIdx + 1)
+    const binary = atob(dataUrl.slice(commaIdx + 1))
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    if (bytes[0] !== 0xFF || bytes[1] !== 0xD8) return dataUrl
+    const out = [0xFF, 0xD8]
+    let i = 2
+    while (i < bytes.length) {
+      if (bytes[i] !== 0xFF) { for (let j=i;j<bytes.length;j++) out.push(bytes[j]); break }
+      const marker = bytes[i+1]
+      if (marker===0xD9||marker===0x01||(marker>=0xD0&&marker<=0xD7)) { out.push(bytes[i],bytes[i+1]); i+=2; continue }
+      if (marker===0xDA) {
+        const segLen=(bytes[i+2]<<8)|bytes[i+3]
+        for (let k=0;k<segLen+2;k++) out.push(bytes[i+k])
+        i+=2+segLen
+        for (let j=i;j<bytes.length;j++) out.push(bytes[j])
+        i=bytes.length; continue
+      }
+      const segLen=(bytes[i+2]<<8)|bytes[i+3]
+      let isIcc=false
+      if (marker===0xE2) {
+        let idStr=''
+        for (let k=0;k<11;k++) idStr+=String.fromCharCode(bytes[i+4+k])
+        if (idStr==='ICC_PROFILE') isIcc=true
+      }
+      if (!isIcc) { for (let k=0;k<segLen+2;k++) out.push(bytes[i+k]) }
+      i+=2+segLen
+    }
+    let outBinary=''
+    for (let i=0;i<out.length;i++) outBinary+=String.fromCharCode(out[i])
+    return header+btoa(outBinary)
+  } catch(e) { return dataUrl }
+}
+
+async function compressImage(dataUrl, maxDim = 1280, quality = 0.85) {
+  return new Promise((resolve) => {
+    const img = new window.Image()
+    img.onload = () => {
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.width * scale)
+      canvas.height = Math.round(img.height * scale)
+      const ctx = canvas.getContext('2d')
+      ctx.fillStyle = '#FFFFFF'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      const raw = canvas.toDataURL('image/jpeg', quality)
+      resolve(stripIccProfile(raw))
+    }
+    img.onerror = () => resolve(dataUrl)
+    img.src = dataUrl
+  })
+}
+
 function fitLine(ctx, text, cx, y, maxW, maxPx, weight, align='center') {
   if (!text) return
   ctx.textAlign = align
