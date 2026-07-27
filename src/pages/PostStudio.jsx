@@ -519,6 +519,16 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
   const photo = assets.find(a => a.id === photoId)
   const selectedTemplate = TEMPLATES.find(t => t.id === selectedTemplateId) ?? TEMPLATES[0]
 
+  useEffect(() => {
+    if (selectedTrend?.templateFamily) {
+      const match = TEMPLATES.find(t => t.family === selectedTrend.templateFamily)
+      if (match) setSelectedTemplateId(match.id)
+    }
+    if (selectedTrend?.colors?.length >= 3) {
+      setAccentColors(TEMPLATES.map((_, i) => selectedTrend.colors[i % selectedTrend.colors.length]))
+    }
+  }, [selectedTrend])
+
   const loadImage = useCallback((url) => new Promise((resolve) => {
     if (!url) { resolve(null); return }
     if (imgCache.current[url]) { resolve(imgCache.current[url]); return }
@@ -648,9 +658,10 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
     try {
       const brandCtx = brand ? `Brand: ${brand.name}. Industry: ${brand.industry}. Tone: ${brand.tone}.` : ''
       const productCtx = productInfo ? `Product: ${productInfo.name}. Tagline: ${productInfo.tagline}. Description: ${productInfo.description}. Benefits: ${productInfo.benefits?.join('; ')}. Ideal for: ${productInfo.idealFor}.` : ''
+      const trendCtx = selectedTrend ? `IMPORTANT - optimise this post specifically for the trend "${selectedTrend.title}". Use this hook style/angle: "${selectedTrend.hook}". This trend works because: ${selectedTrend.why}` : ''
       const result = await callClaude({
-        system:'Social media copywriter. Return JSON only: {"posts":[{"headline":"max 5 words","subtext":"max 10 words","caption":"full caption with emojis","hashtags":["tag1","tag2","tag3","tag4","tag5"],"cta":"2-3 words"}]} — exactly 3 variations with different angles.',
-        messages:[{role:'user',content:`${brandCtx} ${productCtx} Platform: ${platform}. Create 3 post copy variations.`}],
+        system:'Social media copywriter creating viral-style content. Return JSON only: {"posts":[{"headline":"max 5 words","subtext":"max 10 words","caption":"full caption with emojis","hashtags":["tag1","tag2","tag3","tag4","tag5"],"cta":"2-3 words"}]} — exactly 3 variations with different angles.',
+        messages:[{role:'user',content:`${brandCtx} ${productCtx} ${trendCtx} Platform: ${platform}. Create 3 post copy variations.`}],
         max_tokens:1200
       })
       const parsed = extractJSON(result)
@@ -754,7 +765,7 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
     <div className="page">
       <div className="page-header">
         <Palette size={24} className="page-icon-violet"/>
-        <div><h2>Post Studio</h2><p>Choose a template, add your asset, set the scene, then finish in Studio.</p></div>
+        <div><h2>Post Studio</h2><p>Choose a template, add your asset, set the scene, then finish in Studio.</p>{selectedTrend&&<span className="tag tag-gold" style={{marginTop:6,display:'inline-block'}}>Optimising for: {selectedTrend.title}</span>}</div>
       </div>
 
       <div className="steps-bar">
