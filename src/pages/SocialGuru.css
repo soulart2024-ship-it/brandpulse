@@ -1,0 +1,3 @@
+.guru-caption-card { display:flex; flex-direction:column; gap:10px; }
+.guru-caption-text { font-size:13px; color:var(--text-hi); line-height:1.6; white-space:pre-wrap; flex:1; }
+.guru-seo-note { font-size:11px; color:var(--electric); font-style:italic; padding-top:6px; border-top:1px solid var(--border); }

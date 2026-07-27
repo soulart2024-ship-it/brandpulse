@@ -1,5 +1,5 @@
 import { Zap, LayoutDashboard, Brain, Image, TrendingUp,
-         Palette, Video, Calendar, ChevronLeft, Menu, Plus, Trash2, ChevronDown } from 'lucide-react'
+         Palette, Video, Calendar, ChevronLeft, Menu, Plus, Trash2, ChevronDown, MessagesSquare } from 'lucide-react'
 import { useState } from 'react'
 import './Sidebar.css'
 
@@ -10,6 +10,7 @@ const NAV = [
   { id: 'trends',   label: 'Trend Finder',   icon: TrendingUp },
   { id: 'studio',   label: 'Post Studio',    icon: Palette },
   { id: 'video',    label: 'Video Hub',      icon: Video },
+  { id: 'guru',     label: 'Social Guru',    icon: MessagesSquare },
   { id: 'calendar', label: 'Calendar',       icon: Calendar },
 ]
 

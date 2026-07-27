@@ -7,6 +7,7 @@ import AssetLibrary from './pages/AssetLibrary.jsx'
 import TrendFinder from './pages/TrendFinder.jsx'
 import PostStudio from './pages/PostStudio.jsx'
 import VideoHub from './pages/VideoHub.jsx'
+import SocialGuru from './pages/SocialGuru.jsx'
 import Calendar from './pages/Calendar.jsx'
 import './App.css'
 
@@ -117,6 +118,7 @@ export default function App() {
       'trends':  'trend-finder',
       'studio':  'post-studio',
       'video':   'video-hub',
+      'guru':    'social-guru',
       // Full page names pass through unchanged
       'dashboard':     'dashboard',
       'brand-brain':   'brand-brain',
@@ -124,6 +126,7 @@ export default function App() {
       'trend-finder':  'trend-finder',
       'post-studio':   'post-studio',
       'video-hub':     'video-hub',
+      'social-guru':   'social-guru',
       'calendar':      'calendar',
     }
     const target = pageMap[page] ?? page
@@ -139,6 +142,7 @@ export default function App() {
     'trend-finder':  'trends',
     'post-studio':   'studio',
     'video-hub':     'video',
+    'social-guru':   'guru',
     'calendar':      'calendar',
   }[current] ?? 'dashboard'
 
@@ -175,6 +179,7 @@ export default function App() {
         {current === 'trend-finder'  && <TrendFinder   {...pageProps} />}
         {current === 'post-studio'   && <PostStudio    {...pageProps} selectedTrend={selectedTrend} />}
         {current === 'video-hub'     && <VideoHub      {...pageProps} selectedTrend={selectedTrend} />}
+        {current === 'social-guru'   && <SocialGuru    {...pageProps} selectedTrend={selectedTrend} />}
         {current === 'calendar'      && <Calendar      {...pageProps} />}
       </main>
     </div>
