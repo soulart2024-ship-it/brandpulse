@@ -463,6 +463,7 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
   const [generatingVideo, setGeneratingVideo] = useState(false)
   const [videoResultUrl, setVideoResultUrl] = useState(null)
   const [videoError, setVideoError] = useState('')
+  const [motionPrompt, setMotionPrompt] = useState('')
   const [analyzingColors, setAnalyzingColors] = useState(false)
   const [colorAnalysis, setColorAnalysis] = useState(null)
 
@@ -645,7 +646,7 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
           imageBase64: aiImageUrl,
-          prompt: customScene || 'subtle natural motion, cinematic, professional commercial video',
+          prompt: motionPrompt || 'gentle camera drift, subtle parallax movement, soft cinematic motion, natural ambient movement in the scene',
           duration: '5',
           aspectRatio: fmt.id==='story' ? '9:16' : fmt.id==='landscape' ? '16:9' : '1:1'
         })
@@ -966,7 +967,11 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
                   </div>
                   <img src={aiImageUrl} alt="AI scene" className="scene-preview-img"/>
 
-                  <button className="btn btn-secondary" style={{marginTop:10}} onClick={turnToVideo} disabled={generatingVideo}>
+                  <div className="field" style={{marginTop:10}}>
+                    <label>Describe the motion (optional)</label>
+                    <input value={motionPrompt} onChange={e=>setMotionPrompt(e.target.value)} placeholder="e.g. gentle steam rising, soft camera drift, leaves moving in breeze"/>
+                  </div>
+                  <button className="btn btn-secondary" onClick={turnToVideo} disabled={generatingVideo}>
                     {generatingVideo?<><span className="spinner"/> Animating scene — this can take a minute…</>:<>Turn to Video</>}
                   </button>
                   {videoError&&<p className="scan-error">{videoError}</p>}
