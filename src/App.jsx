@@ -174,7 +174,7 @@ export default function App() {
         {current === 'asset-library' && <AssetLibrary  {...pageProps} />}
         {current === 'trend-finder'  && <TrendFinder   {...pageProps} />}
         {current === 'post-studio'   && <PostStudio    {...pageProps} selectedTrend={selectedTrend} />}
-        {current === 'video-hub'     && <VideoHub      {...pageProps} />}
+        {current === 'video-hub'     && <VideoHub      {...pageProps} selectedTrend={selectedTrend} />}
         {current === 'calendar'      && <Calendar      {...pageProps} />}
       </main>
     </div>
