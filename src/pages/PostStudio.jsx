@@ -595,6 +595,21 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
     try {
       const productCtx = productInfo ? `Product: ${productInfo.name}. ${productInfo.description?.slice(0,100)}.` : `Brand: ${brand?.name??''}, Industry: ${brand?.industry??''}`
       const seed = Math.floor(Math.random() * 100000)
+
+      if (selectedTrend) {
+        const trendPrompt = `Platform: ${platform}. ${productCtx}. IMPORTANT: These scenes must specifically match the trend "${selectedTrend.title}" - hook/angle: "${selectedTrend.hook}". Visual mood: ${selectedTrend.typography || 'bold'}. Colour palette to reference: ${(selectedTrend.colors||[]).join(', ')}. Format context: ${selectedTrend.format || ''}. Why it works: ${selectedTrend.why || ''}. Generate 3 scene variations that all embody this SAME trend - different angles on the same visual style, not different trends. Variation seed: ${seed}.`
+        const result = await callClaude({
+          system: 'You are a creative director building scenes to match one specific trend precisely. Return JSON only: { "scenes": [{ "label": "4 word label", "prompt": "Highly detailed scene description for AI image generation that embodies the given trend visual style and mood", "mood": "one word", "trendSource": "how this connects to the trend" }] } - exactly 3 scenes, all matching the SAME trend, varying only in specific setting/angle.',
+          messages: [{ role:'user', content: trendPrompt }],
+          max_tokens: 900
+        })
+        const parsed = extractJSON(result)
+        setScenes(parsed.scenes??[])
+        if (parsed.scenes?.[0]) { setChosenScene(0); setCustomScene(parsed.scenes[0].prompt) }
+        setLoadingScenes(false)
+        return
+      }
+
       const systemPrompt = productType === 'digital'
         ? 'You are a creative director for digital app/service marketing. Search for current trending visual styles for app and digital service marketing on the specified platform. Propose 3 OUTCOME-FOCUSED lifestyle scene concepts that represent the FEELING or RESULT of using this app/service - NOT literal screenshots or device mockups. Show a person experiencing the benefit in a real-world setting. Return JSON only: { "scenes": [{ "label": "4 word label", "prompt": "Highly detailed lifestyle scene description - a person in a real setting experiencing the outcome/benefit of this app, NO phone screens or UI shown", "mood": "one word", "trendSource": "brief note" }] } - exactly 3 scenes, genuinely different.'
         : 'You are a creative director for social media advertising. Search for current real trending visual styles for this product category. Propose 3 scene concepts inspired by what is ACTUALLY trending right now. Return JSON only: { "scenes": [{ "label": "4 word label", "prompt": "Highly detailed specific scene description for AI image generation", "mood": "one word", "trendSource": "brief note" }] } - exactly 3 scenes, genuinely different.'
