@@ -25,21 +25,31 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
-      const channelsData = await callBuffer(`
-        query GetChannels {
-          organizations(input: {}) {
-            id
-            channels { id name service avatar }
+      // Step 1: get organizations via account (correct documented schema)
+      const orgData = await callBuffer(`
+        query GetOrganizations {
+          account {
+            organizations { id name }
           }
         }
       `)
 
-      const orgs = channelsData?.organizations || []
+      const orgs = orgData?.account?.organizations || []
       const organizationId = orgs[0]?.id || null
-      const channels = orgs.flatMap(org => org.channels || [])
+      if (!organizationId) return res.status(200).json({ channels: [], organizationId: null, posts: [] })
+
+      // Step 2: channels is a top-level query taking organizationId directly
+      const channelsData = await callBuffer(`
+        query GetChannels {
+          channels(input: { organizationId: "${organizationId}" }) {
+            id name service avatar
+          }
+        }
+      `)
+      const channels = channelsData?.channels || []
 
       let posts = []
-      if (req.query.posts === 'true' && organizationId && channels.length > 0) {
+      if (req.query.posts === 'true' && channels.length > 0) {
         const channelIds = channels.map(c => `"${c.id}"`).join(',')
         const postsData = await callBuffer(`
           query GetScheduledPosts {
@@ -66,7 +76,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     try {
-      const { text, channelId, imageUrl, dueAt, mode = 'addToQueue' } = req.body
+      const { text, channelId, imageUrl, dueAt, mode = 'addToQueue', mediaType = 'image' } = req.body
       if (!text || !channelId) return res.status(400).json({ error: 'text and channelId are required' })
 
       const inputFields = [
@@ -78,9 +88,8 @@ export default async function handler(req, res) {
       if (mode === 'customScheduled' && dueAt) {
         inputFields.push(`dueAt: ${JSON.stringify(dueAt)}`)
       }
-      const mediaType = req.body.mediaType === 'video' ? 'video' : 'image'
       if (imageUrl) {
-        inputFields.push(`media: { assets: [{ type: ${mediaType}, url: ${JSON.stringify(imageUrl)} }] }`)
+        inputFields.push(`media: { assets: [{ type: ${mediaType === 'video' ? 'video' : 'image'}, url: ${JSON.stringify(imageUrl)} }] }`)
       } else {
         inputFields.push(`assets: []`)
       }
