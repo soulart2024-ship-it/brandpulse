@@ -54,3 +54,6 @@
 .step.active span{color:var(--text-hi);font-weight:600}
 .step.done .step-num{background:var(--success);border-color:var(--success);color:white}
 .step-arrow{color:var(--text-lo);flex-shrink:0}
+
+.template-card-family{font-size:9px;color:var(--text-lo);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:100%}
+.template-card-footer{overflow:hidden}
