@@ -30,7 +30,7 @@ export default async function handler(req, res) {
         prompt: `Keep the ${productName||'product'} EXACTLY as shown — preserve all labels, colors, packaging. Place it naturally in: ${prompt}. Professional commercial photography.`,
         image_url: imageDataUrl,
         num_images: 1,
-        enable_safety_checker: true
+        enable_safety_checker: false
       }
     } else {
       falUrl = 'https://fal.run/fal-ai/flux/schnell'
@@ -39,7 +39,7 @@ export default async function handler(req, res) {
         image_size: 'square_hd',
         num_inference_steps: 4,
         num_images: 1,
-        enable_safety_checker: true
+        enable_safety_checker: false
       }
     }
 
