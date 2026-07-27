@@ -188,16 +188,7 @@ function renderBottomStrip(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoSca
   else if(cfg.accentShape==='topline'){ ctx.fillStyle=accent; ctx.fillRect(0,stripY,w,3) }
   else if(cfg.accentShape==='dot'){ ctx.beginPath(); ctx.arc(w/2,stripY+10,3,0,Math.PI*2); ctx.fillStyle=accent; ctx.fill() }
 
-  let cy
-  if(cfg.kicker){
-    ctx.fillStyle= (cfg.bg==='solid')?withAlpha(textColor,0.55):accent
-    ctx.textAlign=alignL?'left':'center'
-    ctx.font=`700 ${Math.max(7,stripH*0.12)}px "Space Grotesk",sans-serif`
-    ctx.fillText((brand?.industry??'').toUpperCase().slice(0,18), tx, stripY+stripH*0.18)
-    cy = stripY+stripH*0.42
-  } else {
-    cy = stripY+stripH*0.40
-  }
+  const cy = stripY+stripH*0.42
 
   ctx.fillStyle=textColor
   fitLine(ctx,post.headline??'',tx,cy,tw,Math.max(12,stripH*0.24)*(sizes?.headline??1),'800',alignL?'left':'center')
@@ -247,11 +238,8 @@ function renderSidePanel(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoScale
   }
   const tx = panelX + panelW*0.12
   const tw = panelW*0.76
-  ctx.fillStyle=withAlpha(textColor,0.55); ctx.textAlign='left'
-  ctx.font=`600 ${Math.max(7,h*0.031)}px "Space Grotesk",sans-serif`
-  ctx.fillText((brand?.industry??'').toUpperCase().slice(0,12), tx, h*0.16)
   ctx.fillStyle=textColor
-  fitLine(ctx,post.headline??'',tx,h*0.30,tw,Math.max(11,h*0.066)*(sizes?.headline??1),'800','left')
+  fitLine(ctx,post.headline??'',tx,h*0.28,tw,Math.max(11,h*0.066)*(sizes?.headline??1),'800','left')
   ctx.fillStyle=withAlpha(textColor,0.78)
   fitSubtext(ctx,post.subtext??'',tx,h*0.42,tw,h*0.048*(sizes?.subtext??1),Math.max(8,h*0.036)*(sizes?.subtext??1),'left')
   if(cfg.cta!=='none'){
@@ -299,10 +287,6 @@ function renderFullOverlay(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoSca
     ctx.fillText((post.cta??'Learn More').toUpperCase(), tx, cY)
   }
 
-  ctx.fillStyle=withAlpha(textColor,0.85); ctx.textAlign='left'
-  ctx.font=`600 ${Math.max(7,h*0.03)}px "Space Grotesk",sans-serif`
-  ctx.fillText((brand?.industry??'').toUpperCase().slice(0,16), 12, 20)
-
   drawLogo(ctx,w,h,logoImg,logoPos,logoScale)
 }
 
@@ -322,9 +306,6 @@ function renderFramedBorder(ctx,w,h,img,post,brand,accent,logoImg,logoPos,logoSc
   const stripY = innerY+imgH, stripH = innerH-imgH
   ctx.fillStyle='#0F0A1E'; ctx.fillRect(innerX,stripY,innerW,stripH)
   const tw=innerW-28
-  ctx.fillStyle=accent; ctx.textAlign='center'
-  ctx.font=`600 ${Math.max(7,stripH*0.12)}px "Space Grotesk",sans-serif`
-  ctx.fillText((brand?.industry??'').toUpperCase().slice(0,18), innerX+innerW/2, stripY+stripH*0.22)
   ctx.fillStyle=textColor
   fitLine(ctx,post.headline??'',innerX+innerW/2,stripY+stripH*0.48,tw,Math.max(11,stripH*0.22)*(sizes?.headline??1),'800')
   ctx.fillStyle=withAlpha(textColor,0.72)
@@ -479,6 +460,9 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
   const [generatingAI, setGeneratingAI] = useState(false)
   const [aiImageUrl, setAiImageUrl] = useState(null)
   const [aiError, setAiError] = useState('')
+  const [generatingVideo, setGeneratingVideo] = useState(false)
+  const [videoResultUrl, setVideoResultUrl] = useState(null)
+  const [videoError, setVideoError] = useState('')
   const [analyzingColors, setAnalyzingColors] = useState(false)
   const [colorAnalysis, setColorAnalysis] = useState(null)
 
@@ -651,6 +635,26 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
       analyzeImageColors(data.url)
     } catch(e) { setAiError(e.message||'Check your FAL_KEY in Vercel.') }
     setGeneratingAI(false)
+  }
+
+  const turnToVideo = async () => {
+    if (!aiImageUrl) return
+    setGeneratingVideo(true); setVideoError(''); setVideoResultUrl(null)
+    try {
+      const res = await fetch('/api/generate-video', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          imageBase64: aiImageUrl,
+          prompt: customScene || 'subtle natural motion, cinematic, professional commercial video',
+          duration: '5',
+          aspectRatio: fmt.id==='story' ? '9:16' : fmt.id==='landscape' ? '16:9' : '1:1'
+        })
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) throw new Error(data.error || 'Video generation failed')
+      setVideoResultUrl(data.url)
+    } catch(e) { setVideoError(e.message || 'Could not create video — check your FAL_KEY in Vercel.') }
+    setGeneratingVideo(false)
   }
 
   const generatePosts = async () => {
@@ -961,6 +965,20 @@ export default function PostStudio({ brand, assets, onAssetsChange, selectedTren
                     <button className="btn-ghost" style={{fontSize:11,marginLeft:'auto'}} onClick={generateAiImage}><RefreshCw size={11}/> Regenerate free</button>
                   </div>
                   <img src={aiImageUrl} alt="AI scene" className="scene-preview-img"/>
+
+                  <button className="btn btn-secondary" style={{marginTop:10}} onClick={turnToVideo} disabled={generatingVideo}>
+                    {generatingVideo?<><span className="spinner"/> Animating scene — this can take a minute…</>:<>Turn to Video</>}
+                  </button>
+                  {videoError&&<p className="scan-error">{videoError}</p>}
+                  {videoResultUrl&&(
+                    <div style={{marginTop:10}}>
+                      <video src={videoResultUrl} controls autoPlay loop muted className="scene-preview-img" style={{maxHeight:300}}/>
+                      <a href={videoResultUrl} download target="_blank" rel="noopener noreferrer" className="btn btn-secondary" style={{marginTop:8,justifyContent:'center'}}>
+                        <Download size={14}/> Download Video
+                      </a>
+                      <p className="form-hint" style={{marginTop:6}}>To caption and schedule this video to Buffer, head to Video Hub.</p>
+                    </div>
+                  )}
                   {analyzingColors&&<div className="color-analysis-status"><Eye size={12}/><span>Claude Vision picking matching colours…</span></div>}
                   {colorAnalysis&&!analyzingColors&&(
                     <div className="color-analysis-result">
